@@ -10,17 +10,24 @@ img.cross {
 }
 </style>
 <script src="jquery-3.5.1.min.js"></script>
-<div id="cam1" class="cam">
-    <img class="cross" src="crosshair.svg" style="display: none;" onmousedown="$(this).hide();">
-    <div class="monitorFrame">
-        <img class="monitor" src="" onmouseup="setWatcher(1, this)">
+
+<div id="camtpl" style="display: none;">
+    <div id="cam{camID}" class="cam">
+        <img class="cross" src="crosshair.svg" style="display: none;" onmousedown="$(this).hide();">
+        <div class="monitorFrame">
+            <img class="monitor" src="" onmouseup="setWatcher({camID}, this)">
+        </div>
+        IP: <input class="ipaddr" type="text" value="192.168.0.100">
+        <input type="button" value="refresh" onclick="refreshCamera({camID});"><br>
+        X/Y: <input class="watchX" type="number"><input class="watchY" type="number"><br>
+        Size: <input class="watchSize" type="number" value=10>
+        Raster: <input class="watchRaster" type="number" value=5>
     </div>
-    IP: <input class="ipaddr" type="text" value="192.168.0.100">
-    <input type="button" value="refresh" onclick="refreshCamera(1);"><br>
-    X/Y: <input class="watchX" type="number"><input class="watchY" type="number"><br>
-    Size: <input class="watchSize" type="number" value=10>
-    Raster: <input class="watchRaster" type="number" value=5>
 </div>
+<div class="camlist">
+
+</div>
+<input type="button" value="add camera" onclick="addCamera();"><br>
 <img id="urlcaller" src="" style="display: none;">
 <script>
     function getCameraIP(camID) {
@@ -79,11 +86,31 @@ img.cross {
         callURL('http://' + getCameraIP(camID) + '/watch?x=' + xy[0] + '&y=' + xy[1] + '&s=' + size + '&r=' + r + '&t=' + $.now());
         showWatcher(camID);                
     }
+    function getNextCamID() {
+        return $('.camlist .cam').length + 1;
+    }
+    function tplReplace(tpl, key, value) {
+        while(tpl.indexOf('{' + key + '}') !== -1) tpl = tpl.replace('{' + key + '}', value);
+        return tpl;
+    }
+    function addCamera() {
+        var tpl = $('#camtpl').html();
+        var camID = getNextCamID();
+        tpl = tplReplace(tpl, 'camID', camID);
+        $('.camlist').first().append(tpl);
+        return camID;
+    }
+    function refreshCameraList() {
+        var nextCamID = getNextCamID();
+        for (var camID = 0; camID < nextCamID; camID++) {
+            refreshCamera(camID);
+        }
+    }
     $(function() {
-        refreshCamera(1);
+        refreshCamera(addCamera());
         setTimeout(function() {
             setInterval(function() {
-                refreshCamera(1);
+                refreshCameraList();
             }, 1000);
         }, 5000);
     });
