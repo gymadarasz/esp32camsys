@@ -108,7 +108,7 @@ void show_diff(size_t diff_sum) {
     for (int i=0; i<29; i++) {
         if (i*10>diff_sum) s[i] = ' ';
     }
-    ESP_LOGI(TAG, "%s", s);
+    ESP_LOGI(TAG, "%s (%u)", s, diff_sum);
 }
 
 /*****************************/
@@ -119,13 +119,14 @@ camera_fb_t * fb = NULL;
 struct watch_s {
     int x;
     int y;
-    int s;
-    int r;
-} ;
+    int size;
+    int raster;
+    int threshold;
+};
 
 typedef struct watch_s watch_t;
 
-watch_t watcher = {43, 43, 10, 5};
+watch_t watcher = {43, 43, 10, 5, 100};
 static const int watcher_size_max = 40;
 uint8_t prev_buf[40*40*4];
 
@@ -141,6 +142,8 @@ void motion_init() {
     }   
     ESP_LOGI(TAG, "******INIT OK*******");
 }
+
+size_t diff_sum_max = 0;
 
 void motion_detect() {
 //    size_t raster = 3000;
@@ -173,14 +176,14 @@ void motion_detect() {
 //        //ESP_LOGI(TAG, "DIFF SUM: %u", diff_sum);
 //        show_diff(diff_sum);
         
-        int xfrom = watcher.x - watcher.s;
-        int xto = watcher.x + watcher.s;
-        int yfrom = watcher.y - watcher.s;
-        int yto = watcher.y + watcher.s;
+        int xfrom = watcher.x - watcher.size;
+        int xto = watcher.x + watcher.size;
+        int yfrom = watcher.y - watcher.size;
+        int yto = watcher.y + watcher.size;
         int i=0;
         size_t diff_sum = 0;
-        for (int x=xfrom; x<xto; x+=watcher.r) {
-            for (int y=yfrom; y<yto; y+=watcher.r) {
+        for (int x=xfrom; x<xto; x+=watcher.raster) {
+            for (int y=yfrom; y<yto; y+=watcher.raster) {
                 int diff = fb->buf[x+y*fb->width] - prev_buf[i];
                 diff_sum += (diff > 0 ? diff : -diff);
                 prev_buf[i] = fb->buf[x+y*fb->width];
@@ -191,7 +194,25 @@ void motion_detect() {
                 }
             }
         }
+
+//        fb->buf[0] = diff_sum8_max;
+//        
+//        // TODO: mac address back
+//        fb->buf[1] = 0x12;
+//        fb->buf[2] = 0x34;
+//        fb->buf[3] = 0x56;
+//        fb->buf[4] = 0x78;
+//        fb->buf[5] = 0x9a;
+//        fb->buf[6] = 0xbc;
+        
+        if (diff_sum_max < diff_sum) diff_sum_max = diff_sum;
+        
         show_diff(diff_sum);
+        if (diff_sum >= watcher.threshold) {
+            ESP_LOGI(TAG, "******************************************************");
+            ESP_LOGI(TAG, "*********************** [ALERT] **********************");
+            ESP_LOGI(TAG, "******************************************************");
+        }
         
         esp_camera_fb_return(fb);
     
@@ -288,7 +309,11 @@ esp_err_t watch_httpd_handler(httpd_req_t* req) {
      * extra byte for null termination */
     buf_len = httpd_req_get_url_query_len(req) + 1;
     if (buf_len > 1) {
-        int x=43,y=43,s=10, r=1;
+        int     x=watcher.x, 
+                y=watcher.y, 
+                size=watcher.size, 
+                raster=watcher.raster,
+                threshold = watcher.threshold;
         if (fb) {
             x=fb->len/2;
             y=fb->len/2;
@@ -306,28 +331,33 @@ esp_err_t watch_httpd_handler(httpd_req_t* req) {
                     ESP_LOGI(TAG, "Found URL query parameter => y=%s", param);
                     y = atoi(param);
                 }
-                if (httpd_query_key_value(buf, "s", param, sizeof(param)) == ESP_OK) {
-                    ESP_LOGI(TAG, "Found URL query parameter => s=%s", param);
-                    s = atoi(param);
+                if (httpd_query_key_value(buf, "size", param, sizeof(param)) == ESP_OK) {
+                    ESP_LOGI(TAG, "Found URL query parameter => size=%s", param);
+                    size = atoi(param);
                 }
-                if (httpd_query_key_value(buf, "r", param, sizeof(param)) == ESP_OK) {
-                    ESP_LOGI(TAG, "Found URL query parameter => r=%s", param);
-                    r = atoi(param);
+                if (httpd_query_key_value(buf, "raster", param, sizeof(param)) == ESP_OK) {
+                    ESP_LOGI(TAG, "Found URL query parameter => raster=%s", param);
+                    raster = atoi(param);
+                }
+                if (httpd_query_key_value(buf, "threshold", param, sizeof(param)) == ESP_OK) {
+                    ESP_LOGI(TAG, "Found URL query parameter => threshold=%s", param);
+                    threshold = atoi(param);
                 }
             }
             
-            if (s>watcher_size_max) s = watcher_size_max;
-            if (r>s) r = s;
-            if (x<s) x = s;
-            if (y<s) y = s;
-            if (x>fb->width-s) x = fb->width-s;
-            if (y>fb->height-s) y = fb->height-s;
+            if (size>watcher_size_max) size = watcher_size_max;
+            if (raster>size) raster = size;
+            if (x<size) x = size;
+            if (y<size) y = size;
+            if (x>fb->width-size) x = fb->width-size;
+            if (y>fb->height-size) y = fb->height-size;
             free(buf);
         }
         watcher.x = x;
         watcher.y = y;
-        watcher.s = s;
-        watcher.r = r;
+        watcher.size = size;
+        watcher.raster = raster;
+        watcher.threshold = threshold;
     }
 
 //    /* Set some custom headers */
@@ -356,6 +386,65 @@ static const httpd_uri_t watch = {
     .user_ctx  = NULL
 };
 
+esp_err_t sensor_httpd_handler(httpd_req_t* req) {
+//    //camera_fb_t * fb = NULL;
+    esp_err_t res = ESP_OK;
+//    int64_t fr_start = esp_timer_get_time();
+//	
+    //initialize the camera
+    if (!fb) {
+        //motion_init();
+
+        fb = esp_camera_fb_get();
+    }
+    if (!fb) {
+        ESP_LOGE(TAG, "Camera capture failed");
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "DIFF SUM: %u", diff_sum_max);
+
+    size_t w = fb->width;
+    size_t h = fb->height;
+    if (diff_sum_max > fb->width * fb->height) diff_sum_max = fb->width * fb->height;
+    fb->width = diff_sum_max;
+    fb->height = 1;
+    diff_sum_max = 0;
+    
+    uint8_t * buf = NULL;
+    size_t buf_len = 0;
+    bool converted = frame2bmp(fb, &buf, &buf_len);
+    esp_camera_fb_return(fb);
+    
+    fb->width = w;
+    fb->height = h;
+    
+    if(!converted){
+        ESP_LOGE(TAG, "FAKE BMP conversion failed");
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    // TODO: convert to jpeg to get faster net response
+    res = httpd_resp_set_type(req, "image/x-windows-bmp")
+       || httpd_resp_set_hdr(req, "Content-Disposition", "inline; filename=sensor.bmp")
+       || httpd_resp_send(req, (const char *)buf, buf_len);
+    free(buf);
+//    int64_t fr_end = esp_timer_get_time();
+//    ESP_LOGI(TAG, "BMP: %uKB %ums", (uint32_t)(buf_len/1024), (uint32_t)((fr_end - fr_start)/1000));
+    return res;
+}
+
+static const httpd_uri_t sensor = {
+    .uri       = "/sensor",
+    .method    = HTTP_GET,
+    .handler   = sensor_httpd_handler, // TODO: JPEG FASTER!! use/convert jpeg at motion monitor to mark fixed pixels on screen to get faster net speeed
+    /* Let's pass response string in user
+     * context to demonstrate it's usage */
+    .user_ctx  = NULL
+};
+
 
 static httpd_handle_t start_webserver(void)
 {
@@ -371,6 +460,7 @@ static httpd_handle_t start_webserver(void)
 //        httpd_register_uri_handler(server, &echo);
         httpd_register_uri_handler(server, &motion);
         httpd_register_uri_handler(server, &watch);
+        httpd_register_uri_handler(server, &sensor);
 //        httpd_register_uri_handler(server, &ctrl);
         return server;
     }

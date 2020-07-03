@@ -1,6 +1,21 @@
 <style>
+.clear {
+    clear: both;
+}
 div.cam {
     position: relative;
+    border: 1px solid black;
+    margin: 10px;
+    float: left;
+    overflow: hidden;
+}
+div.cam.alarmed {
+    background-color: red;
+}
+div.cam img.sensor {
+    position: absolute;
+    top: -1;
+    left: 0;
 }
 img.cross {
     position: absolute;
@@ -14,27 +29,115 @@ img.cross {
 <div id="camtpl" style="display: none;">
     <div id="cam{camID}" class="cam">
         <img class="cross" src="crosshair.svg" style="display: none;" onmousedown="$(this).hide();">
+        <img class="sensor" src="" height=1>
         <div class="monitorFrame">
             <img class="monitor" src="" onmouseup="setWatcher({camID}, this)">
         </div>
-        IP: <input class="ipaddr" type="text" value="192.168.0.100">
+        MAC: <input class="macaddr" type="text" value="" disabled>
+        IP: <input class="ipaddr" type="text" value="{camIP}" disabled>
         <input type="button" value="refresh" onclick="refreshCamera({camID});"><br>
         X/Y: <input class="watchX" type="number"><input class="watchY" type="number"><br>
         Size: <input class="watchSize" type="number" value=10>
-        Raster: <input class="watchRaster" type="number" value=5>
+        Raster: <input class="watchRaster" type="number" value=5><br>
+        Alert: <input class="alertOn" type="checkbox" checked> 
+        Threshold: <input class="sensorValue" type="number" disabled>/<input class="sensorThreshold" type="number" value="150">
     </div>
 </div>
 <div class="camlist">
 
 </div>
-<input type="button" value="add camera" onclick="addCamera();"><br>
+
+<hr class="clear">
+
+<div class="camsFinder">
+    Cameras: <input type="number" class="camsNumber"></br>
+    IP from: <input type="text" class="camsIPFrom"></br>
+    <input type="button" value="find cameras" onclick="findCameras();">
+</div>
+<input type="button" value="alarm off" onclick="disalarm();">
+<script>
+    function setLocalStorage(key, value) {
+        localStorage[key] = value;
+    }
+    function getLocalStorage(key, dvalue) {
+        return localStorage[key] !== undefined ? localStorage[key] : dvalue;
+    } 
+
+    function saveCamsFinder() {
+        setLocalStorage('camsNumber', $('.camsFinder .camsNumber').first().val());
+        setLocalStorage('camsIPFrom', $('.camsFinder .camsIPFrom').first().val());
+    }
+    function loadCamsFinder() {
+        $('.camsFinder .camsNumber').first().val(getLocalStorage('camsNumber', 2));
+        $('.camsFinder .camsIPFrom').first().val(getLocalStorage('camsIPFrom', '192.168.0.100'));
+    }
+    function callURL(url) {
+        console.log(url);
+        $('#urlcaller').attr('src', url);
+    }
+    function isValidImageURL(url, cbOk, cbFail, attr) {
+        $('<img>').attr('src', url).on("error", function(e) {
+            if (cbFail) cbFail(e, this.src, attr);
+        }).on("load", function(e) {
+            if (cbOk) cbOk(e, this.src, attr);
+        });
+    }
+    function checkCameraOnIP(camIP) {
+        return isValidImageURL('http://' + camIP + '/motion?t=' + $.now(), function(e, src, ip) {
+            addCamera(ip);
+        }, false, camIP);
+    }
+    function getNextIP(camIP) {
+        var splits = camIP.split('.');
+        splits[3]++;
+        if (splits[3]>=256) {
+            splits[3]=0;
+            splits[2]++;
+            if (splits[2] >= 256) {
+                splits[2] = 0;
+                splits[1]++;
+                if (splits[1] >= 256) {
+                    splits[1] = 0;
+                    splits[0]++;
+                    if(splits[0] >= 256) {
+                        splits[0] = 0;
+                    }
+                }
+            }
+        }
+        return splits[0] + '.' + splits[1] + '.' + splits[2] + '.' + splits[3];
+    }
+    function findCameras() {
+        saveCamsFinder();
+        var camsNumber = $('.camsFinder .camsNumber').first().val();
+	if (camsNumber>10) camsNumber = 10;
+        var ip = $('.camsFinder .camsIPFrom').first().val();
+        for (var i=0; i<camsNumber; i++) {
+            checkCameraOnIP(ip);
+            ip = getNextIP(ip);
+        }
+    }
+    $(function(){
+        loadCamsFinder();
+        findCameras();
+    });
+</script>
+
+
+<!-- <input type="button" value="add camera" onclick="addCamera();"><br> -->
 <img id="urlcaller" src="" style="display: none;">
+
 <script>
     function getCameraIP(camID) {
         return $('#cam' + camID + ' input.ipaddr').first().val();
     }
     function refreshCamera(camID) {
-        $('#cam' + camID + ' img.monitor').first().attr('src', 'http://' + getCameraIP(camID) + '/motion?t=' + $.now())
+        var imgUrl = 'http://' + getCameraIP(camID) + '/motion?t=' + $.now();
+        $('#cam' + camID + ' img.monitor').first().attr('src', imgUrl);
+    }
+    function refreshCameraSensor(camID) {
+        var imgUrl = 'http://' + getCameraIP(camID) + '/sensor?t=' + $.now();
+        $('#cam' + camID + ' img.sensor').first().attr('src', imgUrl);
     }
     function getPosition(oElement) {
         if(typeof( oElement.offsetParent ) != "undefined") {
@@ -63,10 +166,6 @@ img.cross {
         py = py - imgPos[1];
         return [px, py];
     }
-    function callURL(url) {
-        console.log(url);
-        $('#urlcaller').attr('src', url);
-    }
     function showWatcher(camID) {
         var x = $('#cam' + camID + ' input.watchX').first().val();
         var y = $('#cam' + camID + ' input.watchY').first().val();
@@ -82,8 +181,16 @@ img.cross {
         $('#cam' + camID + ' input.watchX').first().val(xy[0]);
         $('#cam' + camID + ' input.watchY').first().val(xy[1]);
         var size =  $('#cam' + camID + ' input.watchSize').first().val();
-        var r = $('#cam' + camID + ' input.watchRaster').first().val();
-        callURL('http://' + getCameraIP(camID) + '/watch?x=' + xy[0] + '&y=' + xy[1] + '&s=' + size + '&r=' + r + '&t=' + $.now());
+        var raster = $('#cam' + camID + ' input.watchRaster').first().val();
+        var threshold = $('#cam' + camID + ' input.sensorThreshold').first().val();
+        callURL(
+            'http://' + getCameraIP(camID) + 
+            '/watch?x=' + xy[0] + 
+            '&y=' + xy[1] + 
+            '&size=' + size + 
+            '&raster=' + raster +
+            '&threshold=' + threshold +  
+            '&t=' + $.now());
         showWatcher(camID);                
     }
     function getNextCamID() {
@@ -93,10 +200,20 @@ img.cross {
         while(tpl.indexOf('{' + key + '}') !== -1) tpl = tpl.replace('{' + key + '}', value);
         return tpl;
     }
-    function addCamera() {
+    function getCamID(camIP) {
+        var camID = 0;
+        $('.camlist .cam .ipaddr').each(function(i, e) {
+            if ($(e).val() == camIP) camID = i+1;
+        });
+        return camID;
+    }
+    function addCamera(camIP) {
+        var camID = getCamID(camIP);
+        if (camID > 0) return camID; 
+        camID = getNextCamID();
         var tpl = $('#camtpl').html();
-        var camID = getNextCamID();
         tpl = tplReplace(tpl, 'camID', camID);
+        tpl = tplReplace(tpl, 'camIP', camIP !== undefined ? camIP : '');
         $('.camlist').first().append(tpl);
         return camID;
     }
@@ -106,12 +223,43 @@ img.cross {
             refreshCamera(camID);
         }
     }
+    var alarmOpened = false;
+    function alarm(camID) {
+        $('#cam' + camID + '.cam').addClass('alarmed');
+        if (!alarmOpened) {
+            alarmOpened = true;
+            var child = window.open("alert.mp3");
+            setTimeout(function() {
+                child.close();
+                disalarm();
+            }, 10000);
+        }
+    }
+    function refreshCameraListSensor() {
+        var nextCamID = getNextCamID();
+        for (var camID = 0; camID < nextCamID; camID++) {
+            refreshCameraSensor(camID);
+            var sensorValue = $('#cam' + camID + ' > img.sensor').first().width();
+            var thresholdValue = $('#cam' + camID + ' > input.sensorThreshold').first().val();
+            $('#cam' + camID + ' > input.sensorValue').first().val(sensorValue);
+            if (
+                $('#cam' + camID + ' > input.alertOn').prop("checked") == true &&
+                sensorValue > thresholdValue
+            ) {
+                alarm(camID);
+            }
+        }
+    }
+    function disalarm() {
+        $('.cam.alarmed').removeClass('alarmed');
+        alarmOpened = false;
+    }
     $(function() {
-        refreshCamera(addCamera());
+        //refreshCamera(addCamera());
         setTimeout(function() {
-            setInterval(function() {
-                refreshCameraList();
-            }, 1000);
+            setInterval(function() { refreshCameraList(); }, 1000);
+            setInterval(function() { findCameras(); }, 30000);
+            setInterval(function() { refreshCameraListSensor(); }, 3000);
         }, 5000);
     });
 </script>
