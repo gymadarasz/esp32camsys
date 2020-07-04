@@ -8,17 +8,18 @@ function createWindow () {
     width: 600, 
     height: 600,
     backgroundColor: '#ffffff',
-    icon: `file://${__dirname}/dist/assets/logo.png`
+    //icon: `file://${__dirname}/dist/camsys/assets/logo.png`
   })
+  
+  console.log(`${__dirname}`);
 
-
-  win.loadURL(`file://${__dirname}/dist/index.html`)
+  win.loadURL(`file://${__dirname}/dist/camsys/index.html`)
 
 
 
 
   //// uncomment below to open the DevTools.
-  // win.webContents.openDevTools()
+  win.webContents.openDevTools()
 
   // Event when the window is closed.
   win.on('closed', function () {
