@@ -1,0 +1,22 @@
+<h1>Wifi settings</h1>
+<div>{{ error }}</div>
+<div>
+    <label>SSID/Password:</label>
+    <input type="text" [(ngModel)]="ssid">
+    <input type="password" [(ngModel)]="password">
+    <input type="button" value="Add more Wifi connection.." (click)="onAddWifiClick()">
+</div>
+<label>Wifi list:</label>
+<ul>
+    <li *ngFor="let wifi of wifis">
+        <label>{{ wifi.ssid }}</label>
+        <input type="button" value="remove" (click)="onRemoveWifiClick(wifi.ssid)">
+    </li>
+</ul>
+<div>
+    <label>Select PORT of connected device:</label>
+    <select [(ngModel)]="port">
+        <option *ngFor="let port of ports" [ngValue]="port.path" [title]="getPortInfo(port)">{{ port.path }}</option>
+    </select>
+    <input type="button" value="Upload Wifi settings" (click)="onUploadWifiSettingsClick()">
+</div>

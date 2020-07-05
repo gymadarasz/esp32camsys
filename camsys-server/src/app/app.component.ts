@@ -9,8 +9,8 @@ export class AppComponent {
   title = 'camsys';
   
   constructor() {
-    console.log('hello1');
-    debugger;
+    console.log('hello123');
+    //debugger;
     console.log('fooo');
   }
 }

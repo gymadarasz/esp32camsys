@@ -8,13 +8,13 @@ function createWindow () {
     width: 600, 
     height: 600,
     backgroundColor: '#ffffff',
-    //icon: `file://${__dirname}/dist/camsys/assets/logo.png`
+    //icon: `file://${__dirname}/dist/camsys/assets/logo.png`,
+    webPreferences: {
+      nodeIntegration: true
+    }
   })
 
   win.loadURL(`file://${__dirname}/dist/camsys/index.html`)
-
-
-
 
   //// uncomment below to open the DevTools.
   win.webContents.openDevTools()
@@ -24,6 +24,8 @@ function createWindow () {
     win = null
   })
 }
+
+app.allowRendererProcessReuse = false;
 
 // Create window on electron intialization
 app.on('ready', createWindow)
