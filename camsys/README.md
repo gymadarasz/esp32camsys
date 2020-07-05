@@ -28,4 +28,9 @@ To get more help on the Angular CLI use `ng help` or go check out the [Angular C
 
 ```
 electron-packager . --platform=linux --arch=armv7l
+
+
+$ npm run electron-build
+$ electron-packager . --overwrite
+$ camsys-win32-x64/camsys.exe
 ```

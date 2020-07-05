@@ -10,8 +10,6 @@ function createWindow () {
     backgroundColor: '#ffffff',
     //icon: `file://${__dirname}/dist/camsys/assets/logo.png`
   })
-  
-  console.log(`${__dirname}`);
 
   win.loadURL(`file://${__dirname}/dist/camsys/index.html`)
 

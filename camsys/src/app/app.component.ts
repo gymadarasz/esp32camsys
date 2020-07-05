@@ -7,4 +7,10 @@ import { Component } from '@angular/core';
 })
 export class AppComponent {
   title = 'camsys';
+  
+  constructor() {
+    console.log('hello1');
+    debugger;
+    console.log('fooo');
+  }
 }
