@@ -23,6 +23,7 @@ interface WifiModel {
 export class DeviceSetupComponent implements OnInit {
 
   SerialPort = this.require('serialport');
+  Readline = this.require('@serialport/parser-readline');
 
   error: string = '';
 
@@ -33,9 +34,14 @@ export class DeviceSetupComponent implements OnInit {
 
   wifis: WifiModel[] = [];
 
-  port: string = '';
+  path: string = '';
 
-  comm: any;
+  baudrate = 115200;
+  //charset = 'utf8';
+  //eof = '';
+
+  port: any;
+  parser: any;
 
   constructor() { }
 
@@ -109,27 +115,22 @@ export class DeviceSetupComponent implements OnInit {
     }
   }
 
-  serialConnect(path: string, baudrate: number, charset = 'utf8'): any {
+  serialConnect(path: string) {
 
-    var port = new this.SerialPort(path, {
-      baudRate: baudrate
+    this.port = new this.SerialPort(path, {
+      baudRate: this.baudrate
     });
 
-    port.on('error', (err: Error) => {
+    this.port.on('error', (err: Error) => {
       console.error(err);
-      // this.showError(err.message);
+      this.showError(err.message);
     });
 
-    port.on('open', () => {
+    this.port.on('open', () => {
       console.log('port opened.');
-      // var message =  this.getWifiListMessage();
-      // port.write(message, charset, (err: Error) => {
-      //   console.error(err);
-      //   this.showError('Communication error.');
-      // });
     });
 
-    port.on('close', () => {
+    this.port.on('close', () => {
       console.log('port closed.');
     });
 
@@ -144,66 +145,85 @@ export class DeviceSetupComponent implements OnInit {
     //   console.log('Data:', data);
     // })
 
+    var wifiSetupStep = 1;
 
-    const Readline = this.SerialPort.parsers.Readline;
-    const lineStream = port.pipe(new Readline());
-    lineStream.on('data', (data: any) => {
+    this.parser = this.port.pipe(new this.Readline());
+    this.parser.on('data', (data: any) => {
       console.log('Serial input:' + data);
-    });
-
-    return port;
-  }
-
-  serialSend(port: any, message: string, lineEnding = '\n', charset = 'utf8') {
-    if (!port) {
-      return this.showError('Connect first');
-    }
-    if (!message) { message = ''; }
-    const outputs: string[] = message.split('\n');
-
-    let end = false;
-    outputs.forEach((output) => {
-      if (!end) {
-        port.write(output + lineEnding, charset, (err: any) => {
-          if (err) {
-            console.error(err);
-            end = true;
-          }
-        });
+      if (wifiSetupStep = 1) {
+        if (data.trim() == 'READY TO WIFI SETUP') {
+          
+          console.log('write message 24');
+          var wifiListMessage = this.getWifiListMessage();
+          wifiSetupStep = 2;
+          this.port.write(wifiListMessage /*+ this.eof, this.charset*/, function(err: any) {
+            if (err) {
+              return console.log('Error on write: ', err.message);
+            }
+            console.log('message written');
+          });
+          //this.serialSend(this.port, this.getWifiListMessage(), lineEnding, charset);
+        }
+      } else if (wifiSetupStep == 2) {
+        if (data.trim() == 'ECHO:' + this.getWifiListMessage()) {
+          console.log('wifi setup success');
+        } else {
+          console.log('wifi setup error');
+          this.showError('Wifi Setup Error: ' + data);
+        }
+        this.port.close();
+        wifiSetupStep = 1;
       }
     });
 
-    if (!end) {
-      console.warn('message lost');
-    }
   }
 
+  // serialSend(port: any, message: string) {
+  //   if (!port) {
+  //     return this.showError('Connect first');
+  //   }
+  //   if (!message) { message = ''; }
+  //   const outputs: string[] = message.split('\n');
+
+  //   let end = false;
+  //   outputs.forEach((output) => {
+  //     if (!end) {
+  //       port.write(output + this.eof, this.charset, (err: any) => {
+  //         if (err) {
+  //           console.error(err);
+  //           end = true;
+  //         }
+  //       });
+  //     }
+  //   });
+
+  //   if (!end) {
+  //     console.warn('message lost');
+  //   }
+  // }
+
   onUploadWifiSettingsClick() {
-    if (!this.port) {
+    if (!this.path) {
       this.showError('Please select a port');
       return; 
     }
 
-    var baudrate = 115200;
-    var charset = 'utf8';
-    var lineEnding = '\n';
 
-    this.comm = this.serialConnect(this.port, baudrate, charset);
+    this.serialConnect(this.path);
 
     var that = this;
     setTimeout(function() {
       //that.serialSend(that.comm, that.getWifiListMessage(), lineEnding, charset);
-      that.comm.close();
-    }, 1000);
+      //that.port.close();
+    }, 10010);
     
   }
 
   getWifiListMessage(): string {
-    var message = "WIFI LIST\n";
+    var message = "";
     this.wifis.forEach((wifi: WifiModel) => {
-      message += wifi.ssid + ':' + wifi.password + '\n';
+      message += wifi.ssid + ':' + wifi.password + ';';
     });
-    message += ".\n";
     return message;
   }
 

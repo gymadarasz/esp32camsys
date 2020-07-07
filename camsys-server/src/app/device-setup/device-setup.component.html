@@ -15,7 +15,7 @@
 </ul>
 <div>
     <label>Select PORT of connected device:</label>
-    <select [(ngModel)]="port">
+    <select [(ngModel)]="path">
         <option *ngFor="let port of ports" [ngValue]="port.path" [title]="getPortInfo(port)">{{ port.path }}</option>
     </select>
     <input type="button" value="Upload Wifi settings" (click)="onUploadWifiSettingsClick()">
