@@ -13,10 +13,12 @@
         <input type="button" value="remove" (click)="onRemoveWifiClick(wifi.ssid)">
     </li>
 </ul>
+<label>Server IP address (should be fixed by router and never change it)</label>
+<input type="text"[(ngModel)]="ip">
 <div>
     <label>Select PORT of connected device:</label>
     <select [(ngModel)]="path">
         <option *ngFor="let port of ports" [ngValue]="port.path" [title]="getPortInfo(port)">{{ port.path }}</option>
     </select>
-    <input type="button" value="Upload Wifi settings" (click)="onUploadWifiSettingsClick()">
+    <input type="button" value="Upload Wifi settings" (click)="onUploadWifiSettingsClick()" [disabled]="writeDisabled">
 </div>

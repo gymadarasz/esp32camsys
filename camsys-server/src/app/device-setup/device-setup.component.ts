@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 
 interface PortModel {
+  path: string;
   comName: string;
   locationId?: string;
   manufacturer?: string;
@@ -43,13 +44,28 @@ export class DeviceSetupComponent implements OnInit {
   port: any;
   parser: any;
 
+  ip: string;
+
+  writeDisabled = false;
+
   constructor() { }
 
   ngOnInit(): void {
-    this.SerialPort.list().then((ports: PortModel[]) => {
-      this.ports = ports;
-      console.log(ports);
-    });
+    setInterval(() => {
+      this.SerialPort.list().then((ports: PortModel[]) => {
+        this.ports = ports;
+        var found = false;
+        for (let port of this.ports) {
+          if (port.path == this.path) {
+            found = true;
+            break;
+          }
+        };
+        if (!found) this.path = ports.length > 0 ? ports[0].path : this.path = '';
+      });
+    }, 2000);
+    
+    this.ip = this.getIPListMessage();
   }
 
   require(moduleName: string) {
@@ -62,7 +78,7 @@ export class DeviceSetupComponent implements OnInit {
   fakeRequire(moduleName: string) {
     console.warn('window.require("' + moduleName + '") won\'t work.');
   }
-  
+
   getPortInfo(port: PortModel): string {
     const ret =
       (port.locationId ? ('location: ' + port.locationId + '\n') : '') +
@@ -134,7 +150,7 @@ export class DeviceSetupComponent implements OnInit {
       console.log('port closed.');
     });
 
-        // // Read data that is available but keep the stream in "paused mode"
+    // // Read data that is available but keep the stream in "paused mode"
     // this.port.on('readable', () => {
     //   let data = this.port.read();
     //   console.log('Data:', data);
@@ -150,30 +166,6 @@ export class DeviceSetupComponent implements OnInit {
     this.parser = this.port.pipe(new this.Readline());
     this.parser.on('data', (data: any) => {
       console.log('Serial input:' + data);
-      if (wifiSetupStep = 1) {
-        if (data.trim() == 'READY TO WIFI SETUP') {
-          
-          console.log('write message 24');
-          var wifiListMessage = this.getWifiListMessage();
-          wifiSetupStep = 2;
-          this.port.write(wifiListMessage /*+ this.eof, this.charset*/, function(err: any) {
-            if (err) {
-              return console.log('Error on write: ', err.message);
-            }
-            console.log('message written');
-          });
-          //this.serialSend(this.port, this.getWifiListMessage(), lineEnding, charset);
-        }
-      } else if (wifiSetupStep == 2) {
-        if (data.trim() == 'ECHO:' + this.getWifiListMessage()) {
-          console.log('wifi setup success');
-        } else {
-          console.log('wifi setup error');
-          this.showError('Wifi Setup Error: ' + data);
-        }
-        this.port.close();
-        wifiSetupStep = 1;
-      }
     });
 
   }
@@ -203,29 +195,65 @@ export class DeviceSetupComponent implements OnInit {
   // }
 
   onUploadWifiSettingsClick() {
+    this.writeDisabled = true;
+
     if (!this.path) {
       this.showError('Please select a port');
-      return; 
+      return;
     }
-
 
     this.serialConnect(this.path);
 
-    var that = this;
-    setTimeout(function() {
-      //that.serialSend(that.comm, that.getWifiListMessage(), lineEnding, charset);
-      //that.port.close();
-    }, 10010);
-    
+    setTimeout(() => {
+      var message = [
+        this.getWifiListMessage(),
+        this.ip,
+      ].join('\n');
+      console.log("Message sending: " + message);
+      this.port.write(message, (err: any) => {
+        if (err) {
+          return console.log('Error on write: ', err.message);
+        }
+        console.log('message written');
+        // TODO: check ECHO response to see if write success
+        
+        setTimeout(() => {
+          this.port.close();
+          this.writeDisabled = false;
+        }, 2000);
+      });
+    }, 2000);
+
   }
 
   getWifiListMessage(): string {
-    var message = "";
+    var messages = [];
     this.wifis.forEach((wifi: WifiModel) => {
-      message += wifi.ssid + ':' + wifi.password + ';';
+      messages.push(wifi.ssid + ':' + wifi.password);
     });
-    return message;
+    if (messages.length == 0) {
+      messages.push(this.ssid + ':' + this.password);
+    }
+    return messages.join(';');
   }
 
-  
+  getIPListMessage(): string {
+    
+    var os = this.require('os');
+    var interfaces = os.networkInterfaces();
+    var addresses = [];
+    for (var k in interfaces) {
+      for (var k2 in interfaces[k]) {
+        var address = interfaces[k][k2];
+        if (address.family === 'IPv4' && !address.internal) {
+          addresses.push(address.address);
+        }
+      }
+    }
+
+    console.log(addresses);
+    return addresses.join(';');
+  }
+
+
 }
