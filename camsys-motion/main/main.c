@@ -1,120 +1,22 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "freertos/FreeRTOS.h"
+#include "freertos/event_groups.h"
 #include "freertos/task.h"
+#include "esp_wifi.h"
 #include "esp_system.h"
 #include "esp_log.h"
+#include "esp_event.h"
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "driver/uart.h"
 #include "driver/gpio.h"
 #include "string.h"
 
-/************************ WIFI **************************/
+/************************ COMMON **************************/
 
-#define WIFI_SETUP_UART_TXD         (GPIO_NUM_1)
-#define WIFI_SETUP_UART_RXD         (GPIO_NUM_3)
-#define WIFI_SETUP_UART_RTS         (UART_PIN_NO_CHANGE)
-#define WIFI_SETUP_UART_CTS         (UART_PIN_NO_CHANGE)
-#define WIFI_SETUP_UART_BUFF_SIZE   (4096)
-
-bool set_wifi(const char* data) {
-    // Initialize NVS
-    esp_err_t err = nvs_flash_init();
-    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        // NVS partition was truncated and needs to be erased
-        // Retry nvs_flash_init
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        err = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK( err );
-
-    // Open
-    printf("\n");
-    printf("Opening Non-Volatile Storage (NVS) handle... ");
-    nvs_handle_t nvs_handle;
-    err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
-    if (err != ESP_OK) {
-        printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
-    } else {
-        printf("Done\n");
-
-        // Read
-        size_t size;
-        err = nvs_get_str(nvs_handle, "wifi", NULL, &size);
-        char* old_data = NULL;
-        switch (err) {
-            case ESP_OK:
-                old_data = malloc(size);
-                if (!old_data) {
-                    printf("alloc error");
-                    // Close
-                    nvs_close(nvs_handle);
-                    return false;
-                }
-                err = nvs_get_str(nvs_handle, "wifi", old_data, &size);
-                if (err != ESP_OK) {
-                    printf("retrieve error");
-                    // Close
-                    free(old_data);
-                    nvs_close(nvs_handle);
-                    return false;
-                }
-                if (!strcmp(data, old_data)) {
-                    printf("old data was the same");
-                    // Close
-                    free(old_data);
-                    nvs_close(nvs_handle);
-                    return true;
-                }
-                free(old_data);
-                break;
-            case ESP_ERR_NVS_NOT_FOUND:
-                printf("The value is not initialized yet!\n");
-                break;
-            default :
-                printf("Error (%s) reading!\n", esp_err_to_name(err));
-                break;
-        }
-        
-        // Write
-        printf("Updating wifi data in NVS ... ");
-        err = nvs_set_str(nvs_handle, "wifi", data);
-        if (err != ESP_OK) {
-            printf("Failed!\n");
-            // Close
-            nvs_close(nvs_handle);
-            return false;
-        } else {
-            printf("Done\n");
-        }
-        
-
-        // Commit written value.
-        // After setting any values, nvs_commit() must be called to ensure changes are written
-        // to flash storage. Implementations may write to storage at other times,
-        // but this is not guaranteed.
-        printf("Committing updates in NVS ... ");
-        err = nvs_commit(nvs_handle);
-        if (err != ESP_OK) {
-            printf("Failed!\n");
-            // Close
-            nvs_close(nvs_handle);
-            return false;
-        } else {
-            printf("Done\n");
-        }
-
-        // Close
-        nvs_close(nvs_handle);
-        
-        return true;
-    }
-
-    return false;
-}
-
-char* get_wifi() {
+char* get_settings_nvs() {
     
     // Initialize NVS
     esp_err_t err = nvs_flash_init();
@@ -128,7 +30,7 @@ char* get_wifi() {
     
     // Open
     printf("\n");
-    printf("Opening Non-Volatile Storage (NVS) handle... ");
+    printf("Opening Non-Volatile Storage (NVS) handle... \n");
     nvs_handle_t nvs_handle;
     err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
     if (err != ESP_OK) {
@@ -144,14 +46,14 @@ char* get_wifi() {
             case ESP_OK:
                 old_data = malloc(size);
                 if (!old_data) {
-                    printf("alloc error");
+                    printf("alloc error\n");
                     // Close
                     nvs_close(nvs_handle);
                     return NULL;
                 }
                 err = nvs_get_str(nvs_handle, "wifi", old_data, &size);
                 if (err != ESP_OK) {
-                    printf("retrieve error");
+                    printf("retrieve error\n");
                     // Close
                     free(old_data);
                     nvs_close(nvs_handle);
@@ -174,6 +76,111 @@ char* get_wifi() {
     return NULL;
 }
 
+
+/************************ WIFI **************************/
+
+#define WIFI_SETUP_UART_TXD         (GPIO_NUM_1)
+#define WIFI_SETUP_UART_RXD         (GPIO_NUM_3)
+#define WIFI_SETUP_UART_RTS         (UART_PIN_NO_CHANGE)
+#define WIFI_SETUP_UART_CTS         (UART_PIN_NO_CHANGE)
+#define WIFI_SETUP_UART_BUFF_SIZE   (4096)
+
+bool set_settings_nvs(const char* data) {
+    // Initialize NVS
+    esp_err_t err = nvs_flash_init();
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        // NVS partition was truncated and needs to be erased
+        // Retry nvs_flash_init
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        err = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK( err );
+
+    // Open
+    printf("\n");
+    printf("Opening Non-Volatile Storage (NVS) handle... \n");
+    nvs_handle_t nvs_handle;
+    err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+    } else {
+        printf("Done\n");
+
+        // Read
+        size_t size;
+        err = nvs_get_str(nvs_handle, "wifi", NULL, &size);
+        char* old_data = NULL;
+        switch (err) {
+            case ESP_OK:
+                old_data = malloc(size);
+                if (!old_data) {
+                    printf("alloc error\n");
+                    // Close
+                    nvs_close(nvs_handle);
+                    return false;
+                }
+                err = nvs_get_str(nvs_handle, "wifi", old_data, &size);
+                if (err != ESP_OK) {
+                    printf("retrieve error\n");
+                    // Close
+                    free(old_data);
+                    nvs_close(nvs_handle);
+                    return false;
+                }
+                if (!strcmp(data, old_data)) {
+                    printf("old data was the same\n");
+                    // Close
+                    free(old_data);
+                    nvs_close(nvs_handle);
+                    return true;
+                }
+                free(old_data);
+                break;
+            case ESP_ERR_NVS_NOT_FOUND:
+                printf("The value is not initialized yet!\n");
+                break;
+            default :
+                printf("Error (%s) reading!\n", esp_err_to_name(err));
+                break;
+        }
+        
+        // Write
+        printf("Updating wifi data in NVS ... \n");
+        err = nvs_set_str(nvs_handle, "wifi", data);
+        if (err != ESP_OK) {
+            printf("Failed!\n");
+            // Close
+            nvs_close(nvs_handle);
+            return false;
+        } else {
+            printf("Done\n");
+        }
+        
+
+        // Commit written value.
+        // After setting any values, nvs_commit() must be called to ensure changes are written
+        // to flash storage. Implementations may write to storage at other times,
+        // but this is not guaranteed.
+        printf("Committing updates in NVS ... \n");
+        err = nvs_commit(nvs_handle);
+        if (err != ESP_OK) {
+            printf("Failed!\n");
+            // Close
+            nvs_close(nvs_handle);
+            return false;
+        } else {
+            printf("Done\n");
+        }
+
+        // Close
+        nvs_close(nvs_handle);
+        
+        return true;
+    }
+
+    return false;
+}
+
 void wifi_setup() {
 
     uart_config_t uart_config = {
@@ -191,20 +198,20 @@ void wifi_setup() {
     int len;
     
     // TODO: SECURITY ISSUE HERE! - remove the followin part!
-    char* wifi = get_wifi();
-    printf("Current WIFI data: %s\n", wifi ? wifi : "(NULL)");
-    free(wifi);
+    char* settings_nvs = get_settings_nvs();
+    printf("Current settings: %s\n", settings_nvs ? settings_nvs : "(NULL)");
+    free(settings_nvs);
     
-    printf("READY TO WIFI SETUP\n");
+    printf("Ready to retrieve setup data...\n");
     do {
         len = uart_read_bytes(UART_NUM_0, data, WIFI_SETUP_UART_BUFF_SIZE, 20 / portTICK_RATE_MS);
         data[len] = 0;
     } while(len <= 0);
     
-    if (set_wifi((char*)data)) {
+    if (set_settings_nvs((char*)data)) {
         printf("ECHO:%s\n", data);
     } else {
-        printf("ERROR:Error on wifi data update (may it's not changed)");
+        printf("ERROR:Error on settings update (may it's not changed)\n");
     }
     free(data);
     while(1);
@@ -212,10 +219,138 @@ void wifi_setup() {
 
 /************************ MOTION **************************/
 
+int get_str_pieces(const char* str, char delim) {
+    int i=0, pieces = 1;
+    while(str[i]) {
+        if(str[i] == delim) pieces++;
+        i++;
+    }
+    return pieces;
+}
+
+int get_str_piece_at(char* buff, const char* str, char delim, int pos) {
+    int i=0, j=0, p = 0;
+    buff[j] = 0;
+    while(str[i]) {
+        if (p == pos) {
+            if(str[i] == delim) break;
+            buff[j] = str[i];
+            j++;
+        }
+        if(str[i] == delim) p++;
+        i++;
+    }
+    buff[j] = 0;
+    return j;
+}
+
+bool get_settings_wifi_password(char* pwdbuf, char* settings_nvs, const char* ssid) {    
+    char strbuf[1000];
+    get_str_piece_at(strbuf, settings_nvs, '\n', 0);
+    printf("WIFI Settings: '%s'\n", strbuf);
+    
+    int wifinum = get_str_pieces(strbuf, ';');
+    printf("%d WIFI Settings found.\n", wifinum);
+    
+    for (int i=0; i<wifinum; i++) {
+        char cred[100];
+        get_str_piece_at(cred, strbuf, ';', i);
+        get_str_piece_at(pwdbuf, cred, ':', 0);
+        printf("Check '%s' (%d)\n", pwdbuf, i);
+        if (!strcmp(pwdbuf, ssid)) {
+            get_str_piece_at(pwdbuf, cred, ':', 1);
+            printf("Password for Wifi SSID (%s) is found: '%s'\n", ssid, pwdbuf);
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+
+
+
+
+
+
+
+
+static bool wifi_scan_done = false;
+
+static void wifi_scan_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_SCAN_DONE) wifi_scan_done = true;
+}
+
+bool wifi_connect(const char* ssid, const char* pwd) {
+    
+    return false;
+}
+
+/* Initialise a wifi_ap_record_t, get it populated and display scanned data */
+bool wifi_connect_attempts(char* settings_nvs, uint16_t number)
+{
+    wifi_ap_record_t ap_info[number];
+    uint16_t ap_count = 0;
+    memset(ap_info, 0, sizeof(ap_info));
+    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&number, ap_info));
+    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
+    ESP_LOGI("scan", "Total APs scanned = %u", ap_count);
+    for (int i = 0; (i < number) && (i < ap_count); i++) {
+        ESP_LOGI("scan", "SSID \t\t%s", ap_info[i].ssid);
+        ESP_LOGI("scan", "RSSI \t\t%d", ap_info[i].rssi);
+        ESP_LOGI("scan", "Channel \t\t%d\n", ap_info[i].primary);
+        printf("Attempt to connect to '%s'...\n", ap_info[i].ssid);
+        
+        char pwd[40];
+        if (get_settings_wifi_password(pwd, settings_nvs, (char*)ap_info[i].ssid)) {
+            printf("Password found: '%s'\n", pwd);
+        } else {
+            printf("Password not found.\n");
+            pwd[0] = 0;
+        }
+        // TODO: 
+        return wifi_connect((char*)ap_info[i].ssid, pwd);
+    }
+    return false;
+}
+
+/* Initialize Wi-Fi as sta and start scan */
+bool init_wifi(char* settings_nvs, int max)
+{
+    tcpip_adapter_init();
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_scan_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_start());
+
+    ESP_ERROR_CHECK(esp_wifi_scan_start(NULL, true));
+
+    while (!wifi_scan_done) {
+        vTaskDelay(100 / portTICK_RATE_MS);
+        continue;
+    }
+    return wifi_connect_attempts(settings_nvs, max);
+}
+
+
 void motion_sensor() {
     printf("MOTION DETECTOR MODE\n");
     
-    while(1);
+    char* settings_nvs = get_settings_nvs();
+    printf("NVS Settings are retrieved:\n%s\n", settings_nvs);
+    
+    if (!init_wifi(settings_nvs, 10)) {
+        printf("ERROR: Unable to connect to WIFI. Restart...\n");
+        esp_restart();
+    } else {    
+        printf("Connected to WIFI.\n");
+        while(1);
+    }
+    free(settings_nvs);
 }
 
 /************************ CAMERA **************************/
@@ -241,8 +376,39 @@ static void main_task() {
     else wifi_setup();
 }
 
+
+
+/************************ TESTS **************************/
+
+void test_error(int line) {
+    printf("ERROR: Test failed at %d. Restart...\n", line);
+    esp_restart();
+}
+
+int tests()
+{
+    printf("\n ----[TESTS]---- \n");
+    
+    char* str = "asd/qwe/zxc";    
+    int pieces = get_str_pieces(str, '/');
+    if (pieces != 3) test_error(__LINE__); else printf(".");
+    
+    char piece[100];
+    int len = get_str_piece_at(piece, str, '/', 2);
+    if (strcmp(piece, "zxc")) test_error(__LINE__); else printf(".");
+    if (len != 3) test_error(__LINE__); else printf(".");
+    
+    char pwdbuf[100];
+    if (!get_settings_wifi_password(pwdbuf, "apucika:test123;apucika_EXT:test1234\n192.168.0.104", "apucika_EXT")) test_error(__LINE__); else printf(".");
+    if (strcmp(pwdbuf, "test1234")) test_error(__LINE__); else printf(".");
+    
+    printf("\n ----[TESTS PASSED]---- \n");
+    return 0;
+}
+
 void app_main()
 {
+    tests();
     main_task();
     //xTaskCreate(main_task, "main_task", 1024, NULL, 10, NULL);
 }
