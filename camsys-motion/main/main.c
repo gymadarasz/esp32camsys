@@ -268,9 +268,71 @@ bool get_settings_wifi_password(char* pwdbuf, char* settings_nvs, const char* ss
 }
 
 
+static EventGroupHandle_t s_connect_event_group;
+static ip4_addr_t s_ip_addr;
+static const char *s_connection_name;
 
+static void on_wifi_disconnect(void *arg, esp_event_base_t event_base,
+                               int32_t event_id, void *event_data)
+{
+    ESP_LOGI("camsys", "Wi-Fi disconnected, trying to reconnect...");
+    ESP_ERROR_CHECK(esp_wifi_connect());
+}
 
+static void on_got_ip(void *arg, esp_event_base_t event_base,
+                      int32_t event_id, void *event_data)
+{
+    ESP_LOGI("camsys", "IP given!");
+    ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+    memcpy(&s_ip_addr, &event->ip_info.ip, sizeof(s_ip_addr));
+    xEventGroupSetBits(s_connect_event_group, BIT(0));
+}
 
+bool wifi_connect(const char* ssid, const char* pwd) {
+    printf("WIFI Connecting...\n");
+    if (s_connect_event_group != NULL) {
+        printf("ERROR: s_connect_event_group already set\n");
+        return false;
+    }
+    printf("xEventGroupCreate...\n");
+    s_connect_event_group = xEventGroupCreate();
+
+    //printf("WIFI_INIT_CONFIG_DEFAULT...\n");
+    //wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    //printf("esp_wifi_init...\n");
+    //ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+
+    printf("esp_event_handler_register [on_wifi_disconnect]...\n");
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &on_wifi_disconnect, NULL));
+    
+    printf("esp_event_handler_register [on_got_ip]...\n");
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &on_got_ip, NULL));
+    
+    printf("esp_wifi_set_storage...\n");
+    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    
+    wifi_config_t wifi_config =  {
+         .sta = {
+                 .ssid = "",
+                 .password = "",
+                 .bssid_set = 0
+             }
+     };
+
+    strncpy((char*)wifi_config.sta.ssid, ssid, 32);
+    strncpy((char*)wifi_config.sta.password, pwd, 64);
+        
+    printf("Connecting to %s... (with password:'%s')\n", wifi_config.sta.ssid, wifi_config.sta.password);
+    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
+    ESP_ERROR_CHECK(esp_wifi_connect());
+    s_connection_name = ssid;
+    
+    xEventGroupWaitBits(s_connect_event_group, BIT(0), true, false, portMAX_DELAY);
+    ESP_LOGI("camsys", "Connected to %s", s_connection_name);
+    ESP_LOGI("camsys", "IPv4 address: " IPSTR, IP2STR(&s_ip_addr));
+    return true;
+}
 
 
 
@@ -278,12 +340,10 @@ bool get_settings_wifi_password(char* pwdbuf, char* settings_nvs, const char* ss
 static bool wifi_scan_done = false;
 
 static void wifi_scan_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_SCAN_DONE) wifi_scan_done = true;
-}
-
-bool wifi_connect(const char* ssid, const char* pwd) {
-    
-    return false;
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_SCAN_DONE) {
+        wifi_scan_done = true;
+        ESP_LOGI("camsys", "wifi_scan_done.");
+    }
 }
 
 /* Initialise a wifi_ap_record_t, get it populated and display scanned data */
@@ -294,11 +354,11 @@ bool wifi_connect_attempts(char* settings_nvs, uint16_t number)
     memset(ap_info, 0, sizeof(ap_info));
     ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&number, ap_info));
     ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
-    ESP_LOGI("scan", "Total APs scanned = %u", ap_count);
+    ESP_LOGI("camsys", "Total APs scanned = %u", ap_count);
     for (int i = 0; (i < number) && (i < ap_count); i++) {
-        ESP_LOGI("scan", "SSID \t\t%s", ap_info[i].ssid);
-        ESP_LOGI("scan", "RSSI \t\t%d", ap_info[i].rssi);
-        ESP_LOGI("scan", "Channel \t\t%d\n", ap_info[i].primary);
+        ESP_LOGI("camsys", "SSID \t\t%s", ap_info[i].ssid);
+        ESP_LOGI("camsys", "RSSI \t\t%d", ap_info[i].rssi);
+        ESP_LOGI("camsys", "Channel \t\t%d\n", ap_info[i].primary);
         printf("Attempt to connect to '%s'...\n", ap_info[i].ssid);
         
         char pwd[40];
@@ -317,12 +377,18 @@ bool wifi_connect_attempts(char* settings_nvs, uint16_t number)
 /* Initialize Wi-Fi as sta and start scan */
 bool init_wifi(char* settings_nvs, int max)
 {
+    printf("tcpip_adapter_init...\n");
     tcpip_adapter_init();
+    printf("esp_event_loop_create_default...\n");
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
+
+    printf("esp_wifi_init...\n");
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    
 
+    printf("esp_event_handler_register [wifi_scan_event_handler]...\n");
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_scan_event_handler, NULL));
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_start());
@@ -399,7 +465,7 @@ int tests()
     if (len != 3) test_error(__LINE__); else printf(".");
     
     char pwdbuf[100];
-    if (!get_settings_wifi_password(pwdbuf, "apucika:test123;apucika_EXT:test1234\n192.168.0.104", "apucika_EXT")) test_error(__LINE__); else printf(".");
+    if (!get_settings_wifi_password(pwdbuf, "ssid123:test123;ssid123_EXT:test1234\n192.168.0.104", "ssid123_EXT")) test_error(__LINE__); else printf(".");
     if (strcmp(pwdbuf, "test1234")) test_error(__LINE__); else printf(".");
     
     printf("\n ----[TESTS PASSED]---- \n");
