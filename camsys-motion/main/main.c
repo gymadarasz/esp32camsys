@@ -8,6 +8,7 @@
 #include "esp_system.h"
 #include "esp_log.h"
 #include "esp_event.h"
+#include "esp_websocket_client.h"
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "driver/uart.h"
@@ -15,6 +16,35 @@
 #include "string.h"
 
 /************************ COMMON **************************/
+
+int get_str_pieces(const char* str, char delim) {
+    int i=0, pieces = 1;
+    while(str[i]) {
+        if(str[i] == delim) pieces++;
+        i++;
+    }
+    return pieces;
+}
+
+int get_str_piece_at(char* buff, size_t size, const char* str, char delim, int pos) {
+    int i=0, j=0, p = 0;
+    buff[j] = 0;
+    while(str && str[i]) {
+        if (p == pos) {     
+            if(str[i] == delim) break;
+            buff[j] = str[i];
+            if (size <= j) break;
+            j++;
+        }
+        if(str[i] == delim) p++;
+        i++;
+    }
+    buff[j] = 0;
+    return j;
+}
+
+/************************ NVS **************************/
+
 
 char* get_settings_nvs() {
     
@@ -76,271 +106,8 @@ char* get_settings_nvs() {
     return NULL;
 }
 
-int get_str_pieces(const char* str, char delim) {
-    int i=0, pieces = 1;
-    while(str[i]) {
-        if(str[i] == delim) pieces++;
-        i++;
-    }
-    return pieces;
-}
-
-int get_str_piece_at(char* buff, const char* str, char delim, int pos) {
-    int i=0, j=0, p = 0;
-    buff[j] = 0;
-    while(str[i]) {
-        if (p == pos) {
-            if(str[i] == delim) break;
-            buff[j] = str[i];
-            j++;
-        }
-        if(str[i] == delim) p++;
-        i++;
-    }
-    buff[j] = 0;
-    return j;
-}
-
-bool get_settings_wifi_password(char* pwdbuf, char* settings_nvs, const char* ssid) {    
-    char strbuf[1000];
-    get_str_piece_at(strbuf, settings_nvs, '\n', 0);
-    
-    int wifinum = get_str_pieces(strbuf, ';');
-    printf("%d WIFI Settings found.\n", wifinum);
-    
-    for (int i=0; i<wifinum; i++) {
-        char cred[100];
-        get_str_piece_at(cred, strbuf, ';', i);
-        get_str_piece_at(pwdbuf, cred, ':', 0);
-        printf("Check '%s' (%d)\n", pwdbuf, i);
-        if (!strcmp(pwdbuf, ssid)) {
-            get_str_piece_at(pwdbuf, cred, ':', 1);
-            printf("Password for Wifi SSID (%s) is found.\n", ssid);
-            return true;
-        }
-    }
-    
-    return false;
-}
-
-/************************ WIFI **************************/
-#define WIFI_RECONNECT_ATTEMPTS 20
-
-static bool wifi_scan_done = false;
-static bool wifi_connected = false;
-static int wifi_reconnect_attempts = WIFI_RECONNECT_ATTEMPTS;
-static bool wifi_got_ip = false;
-//static EventGroupHandle_t s_connect_event_group;
-static ip4_addr_t wifi_ip_addr;
-//static const char *s_connection_name;
-static char* settings_nvs;
-
-static void wifi_scan_init();
-static bool wifi_scan_start(int ap_max, int max_try);
 
 
-
-static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
-    printf("WIFI EVENT: %d\n", event_id);
-    
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_SCAN_DONE) {
-        ESP_LOGI("camsys", "wifi_scan_done.");
-        ESP_ERROR_CHECK(esp_wifi_scan_stop());
-        wifi_scan_done = true;
-    }
-    
-    if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        ESP_LOGI("camsys", "IP given!");
-        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-        memcpy(&wifi_ip_addr, &event->ip_info.ip, sizeof(wifi_ip_addr));
-        //xEventGroupSetBits(s_connect_event_group, BIT(0));
-        ESP_ERROR_CHECK(esp_wifi_scan_stop());
-        wifi_connected = true;
-        wifi_got_ip = true;
-    }
-    
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED) {
-        ESP_LOGI("camsys", "wifi_connected.");
-        ESP_ERROR_CHECK(esp_wifi_scan_stop());
-        wifi_reconnect_attempts = WIFI_RECONNECT_ATTEMPTS;
-        wifi_connected = true;
-    }
-    
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        wifi_connected = false;
-        wifi_got_ip = false;
-        
-        ESP_LOGI("camsys", "Wi-Fi disconnected, trying to reconnect...");
-        printf("Reconnect attempts left: %d\n", wifi_reconnect_attempts);
-        wifi_reconnect_attempts--;
-        if (wifi_reconnect_attempts < 0) {
-            printf("ERROR: Connection lost for so long, restarting....\n");
-            esp_restart();
-        }
-        ESP_ERROR_CHECK(esp_wifi_connect());
-        
-        //ESP_ERROR_CHECK(esp_wifi_scan_stop());
-        //ESP_ERROR_CHECK(esp_wifi_stop());
-        
-        //wifi_scan_init();
-        //while (!wifi_scan_start(10, 0));
-        //printf("RE-Connected to WIFI.\n");
-    }
-    
-}
-
-bool wifi_connect(const char* ssid, const char* pwd) {
-    printf("WIFI Connecting...\n");
-    //if (s_connect_event_group != NULL) {
-    //    printf("ERROR: s_connect_event_group already set\n");
-    //    return false;
-    //}
-    //printf("xEventGroupCreate...\n");
-    //s_connect_event_group = xEventGroupCreate();
-
-    
-    printf("esp_wifi_init... (in wifi_connect)\n");
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-
-
-    //printf("esp_event_handler_register [wifi_event_handler]...\n");
-    //ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
-
-    //printf("esp_event_handler_register [on_wifi_disconnect]...\n");
-    //ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &on_wifi_disconnect, NULL));
-    
-    //printf("esp_event_handler_register [on_got_ip]...\n");
-    //ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &on_got_ip, NULL));
-    
-    printf("esp_wifi_set_storage...\n");
-    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    
-    wifi_config_t wifi_config =  {
-         .sta = {
-                 .ssid = "",
-                 .password = "",
-                 .bssid_set = 0
-             }
-     };
-
-    strncpy((char*)wifi_config.sta.ssid, ssid, 32);
-    strncpy((char*)wifi_config.sta.password, pwd, 64);
-    
-    printf("Connecting to %s...\n", wifi_config.sta.ssid);
-    printf("esp_wifi_set_config...\n");
-    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
-    printf("esp_wifi_connect...\n");
-    ESP_ERROR_CHECK(esp_wifi_connect());
-    //s_connection_name = ssid;
-    
-    //printf("xEventGroupWaitBits...\n");
-    //xEventGroupWaitBits(s_connect_event_group, BIT(0), true, false, portMAX_DELAY);
-    printf("Waiting for WIFI connection established...\n");
-    while(!wifi_connected);
-    ESP_LOGI("camsys", "Connected to %s", ssid);
-    ESP_LOGI("camsys", "IPv4 address: " IPSTR, IP2STR(&wifi_ip_addr));
-    return true;
-}
-
-
-
-
-
-
-/* Initialise a wifi_ap_record_t, get it populated and display scanned data */
-bool wifi_connect_attempts(char* settings_nvs, uint16_t ap_max)
-{
-    if (ap_max < 1) ap_max = 1;
-    wifi_ap_record_t ap_info[ap_max];
-    uint16_t ap_count = 0;
-    memset(ap_info, 0, sizeof(ap_info));
-    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_max, ap_info));
-    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
-    ESP_LOGI("camsys", "Total APs scanned = %u", ap_count);
-    for (int i = 0; (i < ap_max) && (i < ap_count); i++) {
-        ESP_LOGI("camsys", "SSID \t\t%s", ap_info[i].ssid);
-        ESP_LOGI("camsys", "RSSI \t\t%d", ap_info[i].rssi);
-        ESP_LOGI("camsys", "Channel \t\t%d\n", ap_info[i].primary);
-        printf("Attempt to connect to '%s'...\n", ap_info[i].ssid);
-        
-        char pwd[40];
-        if (get_settings_wifi_password(pwd, settings_nvs, (char*)ap_info[i].ssid)) {
-            printf("Password found.\n");
-        } else {
-            printf("Password not found.\n");
-            pwd[0] = 0;
-        }
-        // TODO: 
-        return wifi_connect((char*)ap_info[i].ssid, pwd);
-    }
-    return false;
-}
-
-static void wifi_scan_init() {
-    
-    printf("esp_wifi_init... (int wifi_scan_init)\n");
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-    
-    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_start());
-    
-    //printf("esp_event_handler_register [wifi_event_handler]...\n");
-    //ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
-
-    //printf("esp_event_handler_register [on_wifi_disconnect]...\n");
-    //ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &on_wifi_disconnect, NULL));
-    
-    //printf("esp_event_handler_register [on_got_ip]...\n");
-    //ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &on_got_ip, NULL));
-    
-}
-
-/* Initialize Wi-Fi as sta and start scan */
-// ap_max: scan up to ap_max wifi access point
-// max_try: try to connect max_try times before gives up
-// return: true if connected
-static bool wifi_scan_start(int ap_max, int max_try)
-{
-    if (wifi_connected || wifi_got_ip) {
-        printf("WARN: Trying to scan WIFI when already connected.");
-        return true;
-    }
-    bool connected = false;
-    
-    while(!connected) {
-        wifi_connected = false;
-        wifi_got_ip = false;
-        wifi_scan_done = false;        
-        //printf("esp_event_handler_register [wifi_event_handler]...\n");
-        //ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
-
-        printf("Scanning WIFI APs...\n");
-        ESP_ERROR_CHECK(esp_wifi_scan_start(NULL, true));
-        printf("Waiting for scan results...\n");
-        while (!wifi_scan_done) {
-            vTaskDelay(100 / portTICK_RATE_MS);
-            max_try--;
-            if (!max_try) break;
-            if (max_try < 0) max_try = 0;
-        }        
-        ESP_ERROR_CHECK(esp_wifi_scan_stop());
-        printf("WIFI APs are scanned.\n");
-        connected = wifi_connect_attempts(settings_nvs, ap_max);
-    }
-    
-    return connected;
-}
-
-
-#define WIFI_SETUP_UART_TXD         (GPIO_NUM_1)
-#define WIFI_SETUP_UART_RXD         (GPIO_NUM_3)
-#define WIFI_SETUP_UART_RTS         (UART_PIN_NO_CHANGE)
-#define WIFI_SETUP_UART_CTS         (UART_PIN_NO_CHANGE)
-#define WIFI_SETUP_UART_BUFF_SIZE   (4096)
 
 bool set_settings_nvs(const char* data) {
     // Initialize NVS
@@ -438,6 +205,272 @@ bool set_settings_nvs(const char* data) {
     return false;
 }
 
+
+bool get_settings_wifi_password(char* pwdbuf, size_t pwdbuff_size, const char* settings_nvs, const char* ssid) {    
+    size_t size = 1000;
+    char strbuf[size];
+    get_str_piece_at(strbuf, size, settings_nvs, '\n', 0);
+    
+    int wifinum = get_str_pieces(strbuf, ';');
+    printf("%d WIFI Settings found.\n", wifinum);
+    
+    for (int i=0; i<wifinum; i++) {
+        size_t cred_size = 100;
+        char cred[cred_size];
+        get_str_piece_at(cred, cred_size, strbuf, ';', i);
+        get_str_piece_at(pwdbuf, pwdbuff_size, cred, ':', 0);
+        printf("Check '%s' (%d)\n", pwdbuf, i);
+        if (!strcmp(pwdbuf, ssid)) {
+            get_str_piece_at(pwdbuf, pwdbuff_size, cred, ':', 1);
+            printf("Password for Wifi SSID (%s) is found.\n", ssid);
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+char* get_settings_server_uri(char* buff, size_t size, const char* settings_nvs) {
+    get_str_piece_at(buff, size, settings_nvs, '\n', 1);
+    return buff;
+}
+
+
+
+/************************ WIFI SETUP AND AUTO CONNECT **************************/
+
+#define WIFI_SETUP_UART_TXD         (GPIO_NUM_1)
+#define WIFI_SETUP_UART_RXD         (GPIO_NUM_3)
+#define WIFI_SETUP_UART_RTS         (UART_PIN_NO_CHANGE)
+#define WIFI_SETUP_UART_CTS         (UART_PIN_NO_CHANGE)
+#define WIFI_SETUP_UART_BUFF_SIZE   (4096)
+
+
+#define WIFI_RECONNECT_ATTEMPTS 30
+#define WIFI_SCAN_MAX_AP 10
+
+static bool wifi_scan_done = false;
+static bool wifi_connected = false;
+static int wifi_reconnect_attempts = WIFI_RECONNECT_ATTEMPTS;
+static bool wifi_got_ip = false;
+//static EventGroupHandle_t s_connect_event_group;
+static ip4_addr_t wifi_ip_addr;
+//static const char *s_connection_name;
+
+static void wifi_scan_init();
+static bool wifi_scan_start(const char* settings_nvs, int ap_max, int max_try);
+
+
+static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
+    printf("WIFI_EVENT ID: %d\n", event_id);
+    
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_SCAN_DONE) {
+        ESP_LOGI("camsys", "wifi_scan_done.");
+        ESP_ERROR_CHECK(esp_wifi_scan_stop());
+        wifi_scan_done = true;
+    }
+    
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED) {
+        ESP_LOGI("camsys", "wifi_connected.");
+        ESP_ERROR_CHECK(esp_wifi_scan_stop());
+        wifi_reconnect_attempts = WIFI_RECONNECT_ATTEMPTS;
+        wifi_connected = true;
+    }
+    
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {  
+        wifi_connected = false; 
+        
+        ESP_LOGI("camsys", "Wi-Fi disconnected, trying to reconnect...");
+        printf("Reconnect attempts left: %d\n", wifi_reconnect_attempts);
+        wifi_reconnect_attempts--;
+        if (wifi_reconnect_attempts < 0) {
+            
+            ESP_ERROR_CHECK(esp_wifi_scan_stop());
+            ESP_ERROR_CHECK(esp_wifi_stop());
+                
+            wifi_scan_init();
+            char* settings_nvs = get_settings_nvs();
+            while (!wifi_scan_start(settings_nvs, WIFI_SCAN_MAX_AP, 0));
+            free(settings_nvs);
+            
+            if (!wifi_connected) {
+                printf("ERROR: Connection lost for so long, restarting....\n");
+                esp_restart();
+            } 
+            printf("RE-Connected to WIFI.\n");  
+            
+        } else ESP_ERROR_CHECK(esp_wifi_connect());      
+    }
+    
+}
+
+static void ip_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
+    printf("IP_EVENT ID: %d\n", event_id);
+    
+    if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        ESP_LOGI("camsys", "IP given!");
+        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+        memcpy(&wifi_ip_addr, &event->ip_info.ip, sizeof(wifi_ip_addr));
+        //xEventGroupSetBits(s_connect_event_group, BIT(0));
+        ESP_ERROR_CHECK(esp_wifi_scan_stop());
+        wifi_got_ip = true;
+    }
+    
+    if (event_base == IP_EVENT && event_id == IP_EVENT_STA_LOST_IP) {
+        ESP_LOGI("camsys", "IP lost!");
+        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+        memcpy(&wifi_ip_addr, &event->ip_info.ip, sizeof(wifi_ip_addr));
+        //xEventGroupSetBits(s_connect_event_group, BIT(0));
+        ESP_ERROR_CHECK(esp_wifi_scan_stop());
+        wifi_got_ip = false;
+    }
+}
+
+bool wifi_connect(const char* ssid, const char* pwd) {
+    printf("WIFI Connecting...\n");
+    //if (s_connect_event_group != NULL) {
+    //    printf("ERROR: s_connect_event_group already set\n");
+    //    return false;
+    //}
+    //printf("xEventGroupCreate...\n");
+    //s_connect_event_group = xEventGroupCreate();
+
+    
+    //printf("esp_wifi_init... (in wifi_connect)\n");
+    //wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    //ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+
+
+    //printf("esp_event_handler_register [wifi_event_handler]...\n");
+    //ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
+
+    //printf("esp_event_handler_register [on_wifi_disconnect]...\n");
+    //ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &on_wifi_disconnect, NULL));
+    
+    //printf("esp_event_handler_register [on_got_ip]...\n");
+    //ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &on_got_ip, NULL));
+    
+    //printf("esp_wifi_set_storage...\n");
+    //ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
+    //ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    
+    wifi_config_t wifi_config =  {
+         .sta = {
+                 .ssid = "",
+                 .password = "",
+                 .bssid_set = 0
+             }
+     };
+
+    strncpy((char*)wifi_config.sta.ssid, ssid, 32);
+    strncpy((char*)wifi_config.sta.password, pwd, 64);
+    
+    printf("Connecting to %s...\n", wifi_config.sta.ssid);
+    printf("esp_wifi_set_config...\n");
+    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
+    printf("esp_wifi_connect...\n");
+    ESP_ERROR_CHECK(esp_wifi_connect());
+    //s_connection_name = ssid;
+    
+    //printf("xEventGroupWaitBits...\n");
+    //xEventGroupWaitBits(s_connect_event_group, BIT(0), true, false, portMAX_DELAY);
+    printf("Waiting for WIFI connection established...\n");
+    while(!wifi_got_ip);
+    ESP_LOGI("camsys", "Connected to %s", ssid);
+    ESP_LOGI("camsys", "IPv4 address: " IPSTR, IP2STR(&wifi_ip_addr));
+    return true;
+}
+
+
+
+/* Initialise a wifi_ap_record_t, get it populated and display scanned data */
+bool wifi_connect_attempts(const char* settings_nvs, uint16_t ap_max)
+{
+    if (ap_max < 1) ap_max = 1;
+    wifi_ap_record_t ap_info[ap_max];
+    uint16_t ap_count = 0;
+    memset(ap_info, 0, sizeof(ap_info));
+    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_max, ap_info));
+    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
+    ESP_LOGI("camsys", "Total APs scanned = %u", ap_count);
+    for (int i = 0; (i < ap_max) && (i < ap_count); i++) {
+        ESP_LOGI("camsys", "SSID \t\t%s", ap_info[i].ssid);
+        ESP_LOGI("camsys", "RSSI \t\t%d", ap_info[i].rssi);
+        ESP_LOGI("camsys", "Channel \t\t%d\n", ap_info[i].primary);
+        printf("Attempt to connect to '%s'...\n", ap_info[i].ssid);
+        
+        size_t pwd_size = 40;
+        char pwd[pwd_size];
+        if (get_settings_wifi_password(pwd, pwd_size, settings_nvs, (char*)ap_info[i].ssid)) {
+            printf("Password found.\n");
+        } else {
+            printf("Password not found.\n");
+            pwd[0] = 0;
+        }
+        // TODO: 
+        return wifi_connect((char*)ap_info[i].ssid, pwd);
+    }
+    return false;
+}
+
+static void wifi_scan_init() {
+    
+    printf("esp_wifi_init... (int wifi_scan_init)\n");
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    
+    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_start());
+    
+    //printf("esp_event_handler_register [wifi_event_handler]...\n");
+    //ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
+
+    //printf("esp_event_handler_register [on_wifi_disconnect]...\n");
+    //ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &on_wifi_disconnect, NULL));
+    
+    //printf("esp_event_handler_register [on_got_ip]...\n");
+    //ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &on_got_ip, NULL));
+    
+}
+
+/* Initialize Wi-Fi as sta and start scan */
+// ap_max: scan up to ap_max wifi access point
+// max_try: try to connect max_try times before gives up
+// return: true if connected
+static bool wifi_scan_start(const char* settings_nvs, int ap_max, int max_try)
+{
+    if (wifi_connected) {
+        printf("WARN: Trying to scan WIFI when already connected.\n");
+        return true;
+    }
+    bool connected = false;
+    
+    while(!connected) {
+        wifi_connected = false;
+        wifi_got_ip = false;
+        wifi_scan_done = false;        
+        //printf("esp_event_handler_register [wifi_event_handler]...\n");
+        //ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
+
+        printf("Scanning WIFI APs...\n");
+        ESP_ERROR_CHECK(esp_wifi_scan_start(NULL, true));
+        printf("Waiting for scan results...\n");
+        while (!wifi_scan_done) {
+            vTaskDelay(100 / portTICK_RATE_MS);
+            max_try--;
+            if (!max_try) break;
+            if (max_try < 0) max_try = 0;
+        }
+        ESP_ERROR_CHECK(esp_wifi_scan_stop());
+        printf("WIFI APs are scanned.\n");
+        connected = wifi_connect_attempts(settings_nvs, ap_max);
+    }
+    
+    return connected;
+}
+
+
 void wifi_setup() {
 
     uart_config_t uart_config = {
@@ -474,9 +507,7 @@ void wifi_setup() {
     while(1);
 }
 
-void wifi_auto_start() {
-    settings_nvs = get_settings_nvs();
-    printf("NVS Settings are retrieved.\n");
+void wifi_auto_start(const char* settings_nvs) {
     
     printf("tcpip_adapter_init...\n");
     tcpip_adapter_init();
@@ -486,27 +517,110 @@ void wifi_auto_start() {
     
     printf("esp_event_handler_register [wifi_event_handler]...\n");
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
+    printf("esp_event_handler_register [ip_event_handler]...\n");
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, &ip_event_handler, NULL));
     
     wifi_scan_init();
-    while (!wifi_scan_start(10, 0));
+    while (!wifi_scan_start(settings_nvs, WIFI_SCAN_MAX_AP, 0));
     printf("Connected to WIFI.\n");
     
+}
+
+/************************ WEBSOCKET CLIENT **************************/
+
+#define NO_DATA_TIMEOUT_SEC 30
+
+static SemaphoreHandle_t shutdown_sema;
+static TimerHandle_t shutdown_signal_timer;
+
+static void shutdown_signaler(TimerHandle_t xTimer)
+{
+    ESP_LOGI("camsys", "No data received for %d seconds, signaling shutdown", NO_DATA_TIMEOUT_SEC);
+    xSemaphoreGive(shutdown_sema);
+}
+
+static void websocket_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
+{
+    esp_websocket_event_data_t *data = (esp_websocket_event_data_t *)event_data;
+    switch (event_id) {
+    case WEBSOCKET_EVENT_CONNECTED:
+        ESP_LOGI("camsys", "WEBSOCKET_EVENT_CONNECTED");
+        break;
+    case WEBSOCKET_EVENT_DISCONNECTED:
+        ESP_LOGI("camsys", "WEBSOCKET_EVENT_DISCONNECTED");
+        break;
+    case WEBSOCKET_EVENT_DATA:
+        ESP_LOGI("camsys", "WEBSOCKET_EVENT_DATA");
+        ESP_LOGI("camsys", "Received opcode=%d", data->op_code);
+        ESP_LOGW("camsys", "Received=%.*s", data->data_len, (char *)data->data_ptr);
+        ESP_LOGW("camsys", "Total payload length=%d, data_len=%d, current payload offset=%d\r\n", data->payload_len, data->data_len, data->payload_offset);
+
+        xTimerReset(shutdown_signal_timer, portMAX_DELAY);
+        break;
+    case WEBSOCKET_EVENT_ERROR:
+        ESP_LOGI("camsys", "WEBSOCKET_EVENT_ERROR");
+        break;
+    }
+}
+
+static void websocket_start(const char* settings_nvs)
+{
+    esp_websocket_client_config_t websocket_cfg = {};
+
+    shutdown_signal_timer = xTimerCreate("Websocket shutdown timer", NO_DATA_TIMEOUT_SEC * 1000 / portTICK_PERIOD_MS, pdFALSE, NULL, shutdown_signaler);
+    shutdown_sema = xSemaphoreCreateBinary();
+
+    size_t strsize = 1000;
+    char strbuf[strsize];
+    websocket_cfg.uri = get_settings_server_uri(strbuf, strsize, settings_nvs);
+
+    ESP_LOGI("camsys", "Connecting to websocket: %s...", websocket_cfg.uri);
+
+    esp_websocket_client_handle_t client = esp_websocket_client_init(&websocket_cfg);
+    esp_websocket_register_events(client, WEBSOCKET_EVENT_ANY, websocket_event_handler, (void *)client);
+
+    esp_websocket_client_start(client);
+    xTimerStart(shutdown_signal_timer, portMAX_DELAY);
+    char data[32];
+    int i = 0;
+    while (i < 100) {
+        if (esp_websocket_client_is_connected(client)) {
+            int len = sprintf(data, "hello %04d\n", i++);
+            ESP_LOGI("camsys", "Sending %s", data);
+            esp_websocket_client_send_text(client, data, len, portMAX_DELAY);
+        }
+        vTaskDelay(1000 / portTICK_RATE_MS);
+    }
+
+    xSemaphoreTake(shutdown_sema, portMAX_DELAY);
+    esp_websocket_client_stop(client);
+    ESP_LOGI("camsys", "Websocket Stopped");
+    esp_websocket_client_destroy(client);
+}
+
+/************************ BOILERPLATE **************************/
+
+void wifi_wesocket_client_app_boilerplate() {
+    char* settings_nvs = get_settings_nvs();
+    printf("NVS Settings are retrieved.\n");
+    wifi_auto_start(settings_nvs);
+    websocket_start(settings_nvs);
     free(settings_nvs);
 }
 
 /************************ MOTION **************************/
 
 void motion_sensor() {
-    printf("MOTION DETECTOR MODE\n");
-    wifi_auto_start();
+    wifi_wesocket_client_app_boilerplate();
+    printf("MOTION DETECTOR START\n");
     while(1); // TODO: main loop here
 }
 
 /************************ CAMERA **************************/
 
 void camera_recorder() {
-    printf("CAMERA RECORDER MODE\n");
-    wifi_auto_start();
+    wifi_wesocket_client_app_boilerplate();
+    printf("CAMERA RECORDER START\n");
     while(1); // TODO: main loop here
 }
 
@@ -521,8 +635,11 @@ static void main_task() {
     //gpio_set_direction(GPIO_NUM_12, GPIO_MODE_INPUT);
     //int mode = gpio_get_level(GPIO_NUM_12);
     
-    if (!gpio_get_level(GPIO_NUM_12)) motion_sensor();
-    else if (!gpio_get_level(GPIO_NUM_13)) camera_recorder();
+    int motion_button_state = !gpio_get_level(GPIO_NUM_12);
+    int camera_button_state = !gpio_get_level(GPIO_NUM_13);
+    
+    if (motion_button_state) motion_sensor();
+    else if (camera_button_state) camera_recorder();
     else wifi_setup();
 }
 
@@ -532,6 +649,7 @@ static void main_task() {
 
 void test_error(int line) {
     printf("ERROR: Test failed at %d. Restart...\n", line);
+    while(1);
     esp_restart();
 }
 
@@ -544,12 +662,12 @@ int tests()
     if (pieces != 3) test_error(__LINE__); else printf(".");
     
     char piece[100];
-    int len = get_str_piece_at(piece, str, '/', 2);
+    int len = get_str_piece_at(piece, 100, str, '/', 2);
     if (strcmp(piece, "zxc")) test_error(__LINE__); else printf(".");
     if (len != 3) test_error(__LINE__); else printf(".");
     
     char pwdbuf[100];
-    if (!get_settings_wifi_password(pwdbuf, "ssid123:test123;ssid123_EXT:test1234\n192.168.0.104", "ssid123_EXT")) test_error(__LINE__); else printf(".");
+    if (!get_settings_wifi_password(pwdbuf, 100, "ssid123:test123;ssid123_EXT:test1234\n192.168.0.104", "ssid123_EXT")) test_error(__LINE__); else printf(".");
     if (strcmp(pwdbuf, "test1234")) test_error(__LINE__); else printf(".");
     
     printf("\n ----[TESTS PASSED]---- \n");

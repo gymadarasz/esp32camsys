@@ -64,7 +64,9 @@ export class DeviceSetupComponent implements OnInit {
         if (!found) this.path = ports.length > 0 ? ports[0].path : this.path = '';
       });
     }, 2000);
-    
+     
+    this.wifis = JSON.parse(localStorage.getItem('deviceSetup')).wifis ?? [];
+    console.log('wifis from local storage:', this.wifis);
     this.ip = this.getIPListMessage();
   }
 
@@ -195,6 +197,10 @@ export class DeviceSetupComponent implements OnInit {
   // }
 
   onUploadWifiSettingsClick() {
+    localStorage.setItem('deviceSetup', JSON.stringify({
+      wifis: this.wifis
+    }));
+
     this.writeDisabled = true;
 
     if (!this.path) {
@@ -223,7 +229,6 @@ export class DeviceSetupComponent implements OnInit {
         }, 2000);
       });
     }, 2000);
-
   }
 
   getWifiListMessage(): string {
@@ -246,7 +251,7 @@ export class DeviceSetupComponent implements OnInit {
       for (var k2 in interfaces[k]) {
         var address = interfaces[k][k2];
         if (address.family === 'IPv4' && !address.internal) {
-          addresses.push(address.address);
+          addresses.push('ws://' + address.address + ':8080');
         }
       }
     }
