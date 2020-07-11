@@ -1,0 +1,31 @@
+<!-- img id="capture" -->
+<canvas id="captureCanvas"></canvas>
+<script>
+    function getPixel(url, x, y) {
+      var img = new Image();
+      img.src = url;
+      var canvas = document.createElement('canvas');
+      var context = canvas.getContext('2d');
+      context.drawImage(img, 0, 0);
+      return context.getImageData(x, y, 1, 1).data;
+    }
+
+    setInterval(function() {
+//         var src = 'http://192.168.0.107/capture?ts=' + Date.now();
+//         var img = document.getElementById('capture');
+//         img.setAttribute('src', src);
+//         var canvas = document.createElement('canvas');
+//         var context = canvas.getContext('2d');
+//         context.drawImage(img, 0, 0);
+//         var pels = context.getImageData(10, 10, 1, 1).data; // [255, 255, 255, 0];
+//         console.log(pels);
+
+        var img = new Image();
+        var url = 'http://192.168.0.107/capture?ts=' + Date.now();
+        img.setAttribute('src', url);
+        var canvas = document.getElementById('captureCanvas');
+        var context = canvas.getContext('2d');
+        context.drawImage(img, 0, 0);
+
+    }, 100);
+</script>

@@ -1,0 +1,27 @@
+<!-- <img id="stream" src="http://192.168.0.107:81/stream"> -->
+<video autoplay="true" id="video" src="http://192.168.0.107:81/stream"></video>
+<canvas id="canvas"><canvas>
+<script>
+    var canvas = document.getElementById('canvas');
+    var context = canvas.getContext('2d');
+    //var img = document.getElementById('stream');
+    //img.crossOrigin = "Anonymous";
+    document.getElementById('video').setAttribute('src', 'http://192.168.0.107:81/stream');
+
+    canvas.width = img.width;
+    canvas.height = img.height;
+
+    setInterval(function() {
+
+        cons
+
+        //var canvas = document.createElement('canvas');
+
+        //context.clearRect(0, 0, img.width, img.height);
+        //context.drawImage(img, 0, 0, img.width, img.height);
+        //console.log(img.width, img.height);
+        
+        //var pixelData = context.getImageData(10, 10, 1, 1).data;
+       // console.log(pixelData);
+    }, 1000);
+</script>
