@@ -1,30 +1,40 @@
 import { Component, OnInit } from '@angular/core';
+import { ClientDeviceService } from '../client-device.service';
+import { ClientDevice } from '../client-device';
+import { ClientDevicesChangeListener } from '../client-devices-change-listener';
+//import { ClientDevice } from '../client-device';
+//import { ClientDeviceModel } from '../client-device-model';
 
 @Component({
   selector: 'app-camera-server',
   templateUrl: './camera-server.component.html',
   styleUrls: ['./camera-server.component.css']
 })
-export class CameraServerComponent implements OnInit {
+export class CameraServerComponent implements OnInit, ClientDevicesChangeListener {
 
   WebSocketServer = this.require('websocket').server;
   http = this.require('http');
 
   server: any;
+  wsServer: any;
 
-  constructor() { }
+  //clientDevices: ClientDeviceModel[] = [];
+
+  clientDevicesCount = 0;
+
+  constructor(private clientDeviceService: ClientDeviceService) { }
 
   ngOnInit(): void {
-    this.server = this.http.createServer(function (request, response) {
+    this.server = this.http.createServer((request: any, response: any) => {
       console.log((new Date()) + ' Received request for ' + request.url);
       response.writeHead(404);
       response.end();
     });
-    this.server.listen(8080, function () {
+    this.server.listen(8080, () => {
       console.log((new Date()) + ' Server is listening on port 8080');
     });
 
-    var wsServer = new this.WebSocketServer({
+    this.wsServer = new this.WebSocketServer({
       httpServer: this.server,
       // You should not use autoAcceptConnections for production
       // applications, as it defeats all standard cross-origin protection
@@ -34,41 +44,19 @@ export class CameraServerComponent implements OnInit {
       autoAcceptConnections: false
     });
 
-    function originIsAllowed(origin) {
-      // put logic here to detect whether the specified origin is allowed.
-      return true;
-    }
-
-    wsServer.on('request', function (request) {
+    this.wsServer.on('request', (request: any) => {
       console.log('request:', request);
-      if (!originIsAllowed(request.origin)) {
-        // Make sure we only accept requests from an allowed origin
-        request.reject();
-        console.log((new Date()) + ' Connection from origin ' + request.origin + ' rejected.');
-        return;
-      }
-
-      var connection = request.accept(); //'echo-protocol', request.origin);
-      console.log((new Date()) + ' Connection accepted.');
-      connection.on('message', function (message: any) {
-        console.log('received message object:', message);
-        if (message.type === 'utf8') {
-          console.log('Received Message: ' + message.utf8Data);
-          connection.sendUTF(message.utf8Data);
-        }
-        else if (message.type === 'binary') {
-          console.log('Received Binary Message of ' + message.binaryData.length + ' bytes');
-          message.binaryData.push(13);
-          connection.sendBytes(message.binaryData);
-        }
-      });
-      connection.on('close', function (reasonCode, description) {
-        console.log((new Date()) + ' Peer ' + connection.remoteAddress + ' disconnected.');
-      });
+      this.clientDeviceService.createClientDevice().onConnected(request);
     });
+
+    this.clientDeviceService.registerClientDevicesChange(this);
   }
 
+  onClientDevicesChange(clientDevices: ClientDevice[]) {
+    this.clientDevicesCount = clientDevices.length;
+  }
 
+  // TODO require service
   require(moduleName: string) {
     const req = 'require';
     const require = window[req] ? window[req] : this.fakeRequire;

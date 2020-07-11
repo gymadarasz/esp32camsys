@@ -43,6 +43,16 @@ int get_str_piece_at(char* buff, size_t size, const char* str, char delim, int p
     return j;
 }
 
+/************************ ESP SPECIFIC COMMON **************************/
+
+char* get_mac_addr(char* buff, size_t size) {
+    uint8_t mac[20];
+    ESP_ERROR_CHECK(esp_efuse_mac_get_default(mac));
+    snprintf(buff, size, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]); // TODO: hope it's unigue enough
+    return buff;
+}
+
+
 /************************ NVS **************************/
 
 
@@ -533,6 +543,12 @@ void wifi_auto_start(const char* settings_nvs) {
 static SemaphoreHandle_t shutdown_sema;
 static TimerHandle_t shutdown_signal_timer;
 
+
+void wifi_websocket_client_app_connected(esp_websocket_client_handle_t client);
+void wifi_websocket_client_app_disconnected(esp_websocket_client_handle_t client);
+void wifi_websocket_client_app_error(esp_websocket_client_handle_t client);
+void wifi_websocket_client_app_data(esp_websocket_client_handle_t client, esp_websocket_event_data_t *data);
+
 static void shutdown_signaler(TimerHandle_t xTimer)
 {
     ESP_LOGI("camsys", "No data received for %d seconds, signaling shutdown", NO_DATA_TIMEOUT_SEC);
@@ -541,29 +557,34 @@ static void shutdown_signaler(TimerHandle_t xTimer)
 
 static void websocket_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
+    printf("WEBSOCKT EVENT ID: %d\n", event_id);
+    
     esp_websocket_event_data_t *data = (esp_websocket_event_data_t *)event_data;
     switch (event_id) {
     case WEBSOCKET_EVENT_CONNECTED:
         ESP_LOGI("camsys", "WEBSOCKET_EVENT_CONNECTED");
+        wifi_websocket_client_app_connected(handler_args);
         break;
     case WEBSOCKET_EVENT_DISCONNECTED:
         ESP_LOGI("camsys", "WEBSOCKET_EVENT_DISCONNECTED");
+        wifi_websocket_client_app_disconnected(handler_args);
         break;
     case WEBSOCKET_EVENT_DATA:
         ESP_LOGI("camsys", "WEBSOCKET_EVENT_DATA");
         ESP_LOGI("camsys", "Received opcode=%d", data->op_code);
         ESP_LOGW("camsys", "Received=%.*s", data->data_len, (char *)data->data_ptr);
         ESP_LOGW("camsys", "Total payload length=%d, data_len=%d, current payload offset=%d\r\n", data->payload_len, data->data_len, data->payload_offset);
-
+        if (data->data_len) wifi_websocket_client_app_data(handler_args, data);
         xTimerReset(shutdown_signal_timer, portMAX_DELAY);
         break;
     case WEBSOCKET_EVENT_ERROR:
         ESP_LOGI("camsys", "WEBSOCKET_EVENT_ERROR");
+        wifi_websocket_client_app_error(handler_args);
         break;
     }
 }
 
-static void websocket_start(const char* settings_nvs)
+esp_websocket_client_handle_t websocket_start(const char* settings_nvs)
 {
     esp_websocket_client_config_t websocket_cfg = {};
 
@@ -581,48 +602,180 @@ static void websocket_start(const char* settings_nvs)
 
     esp_websocket_client_start(client);
     xTimerStart(shutdown_signal_timer, portMAX_DELAY);
-    char data[32];
-    int i = 0;
-    while (i < 100) {
-        if (esp_websocket_client_is_connected(client)) {
-            int len = sprintf(data, "hello %04d\n", i++);
-            ESP_LOGI("camsys", "Sending %s", data);
-            esp_websocket_client_send_text(client, data, len, portMAX_DELAY);
-        }
-        vTaskDelay(1000 / portTICK_RATE_MS);
-    }
+    while(!esp_websocket_client_is_connected(client)) vTaskDelay(1000 / portTICK_RATE_MS);
+    //char data[32];
+    //int i = 0;
+    //while (i < 100) {
+    //    if (esp_websocket_client_is_connected(client)) {
+    //        int len = sprintf(data, "hello %04d\n", i++);
+    //        ESP_LOGI("camsys", "Sending %s", data);
+    //        esp_websocket_client_send_text(client, data, len, portMAX_DELAY);
+    //    }
+    //    vTaskDelay(1000 / portTICK_RATE_MS);
+    //}
 
+    return client;
+}
+
+/************************ BOILERPLATE **************************/
+
+
+typedef void (*wifi_websocket_client_app_setup_handler_t)(esp_websocket_client_handle_t client, char* settings_nvs);
+typedef void (*wifi_websocket_client_app_event_handler_t)(esp_websocket_client_handle_t client);
+typedef void (*wifi_websocket_client_app_data_handler_t)(esp_websocket_client_handle_t client, esp_websocket_event_data_t *data);
+
+static bool wifi_websocket_client_app_exited = false;
+static wifi_websocket_client_app_event_handler_t wifi_websocket_client_app_connected_cb;
+static wifi_websocket_client_app_event_handler_t wifi_websocket_client_app_disconnected_cb;
+static wifi_websocket_client_app_event_handler_t wifi_websocket_client_app_error_cb;
+static wifi_websocket_client_app_data_handler_t wifi_websocket_client_app_data_cb;
+
+
+void wifi_websocket_client_app_connected(esp_websocket_client_handle_t client) {
+    printf("Websocket connected.\n");
+    if (wifi_websocket_client_app_connected_cb) wifi_websocket_client_app_connected_cb(client);
+}
+void wifi_websocket_client_app_disconnected(esp_websocket_client_handle_t client) {
+    printf("Websocket disconnected.\n");
+    if (wifi_websocket_client_app_disconnected_cb) wifi_websocket_client_app_disconnected_cb(client);
+}
+void wifi_websocket_client_app_error(esp_websocket_client_handle_t client) {
+    printf("Websocket error.\n");
+    if (wifi_websocket_client_app_error_cb) wifi_websocket_client_app_error_cb(client);
+}
+
+void wifi_websocket_client_app_data(esp_websocket_client_handle_t client, esp_websocket_event_data_t *data) {
+    printf("Websocket data received: '%s'\n", (char *)data->data_ptr);
+    if (wifi_websocket_client_app_data_cb) wifi_websocket_client_app_data_cb(client, data);
+}
+
+int wifi_websocket_client_app_send(esp_websocket_client_handle_t client, const char* data, size_t len) {
+    printf("Websocket send (binary data) in %d bytes...\n", len);
+    return esp_websocket_client_send(client, data, len, portMAX_DELAY);
+}
+
+int wifi_websocket_client_app_send_text(esp_websocket_client_handle_t client, const char* text) {
+    printf("Websocket send (text): '%s'...\n", text);
+    return esp_websocket_client_send_text(client, text, strlen(text)+1, portMAX_DELAY);
+}
+
+int wifi_websocket_client_app_printf(esp_websocket_client_handle_t client, const char* fmt, ...) {
+    char buffer[1000];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buffer, sizeof(buffer), fmt, args);
+    
+    printf("BUFFER:'%s'\n", buffer);
+    
+    int ret = wifi_websocket_client_app_send_text(client, buffer);
+    
+    printf("Buffer sent\n");
+    
+    va_end(args);
+    return ret;
+}
+
+void wifi_websocket_client_app_exit() {
+    printf("wifi_websocket_client_app_exit...\n");
+    wifi_websocket_client_app_exited = true;
+}
+
+void wifi_websocket_client_app_stop(esp_websocket_client_handle_t client) {
     xSemaphoreTake(shutdown_sema, portMAX_DELAY);
     esp_websocket_client_stop(client);
     ESP_LOGI("camsys", "Websocket Stopped");
     esp_websocket_client_destroy(client);
 }
 
-/************************ BOILERPLATE **************************/
-
-void wifi_wesocket_client_app_boilerplate() {
+void wifi_websocket_client_app_start(
+    wifi_websocket_client_app_setup_handler_t setup_cb, 
+    wifi_websocket_client_app_event_handler_t loop_cb, 
+    wifi_websocket_client_app_data_handler_t data_cb,
+    wifi_websocket_client_app_event_handler_t connected_cb, 
+    wifi_websocket_client_app_event_handler_t disconnected_cb, 
+    wifi_websocket_client_app_event_handler_t error_cb
+) 
+{
     char* settings_nvs = get_settings_nvs();
     printf("NVS Settings are retrieved.\n");
+    printf("wifi_auto_start...\n");
     wifi_auto_start(settings_nvs);
-    websocket_start(settings_nvs);
+    
+    printf("websocket_start...\n");
+    wifi_websocket_client_app_connected_cb = connected_cb;
+    wifi_websocket_client_app_disconnected_cb = disconnected_cb;
+    wifi_websocket_client_app_error_cb = error_cb;
+    wifi_websocket_client_app_data_cb = data_cb;
+    esp_websocket_client_handle_t client = websocket_start(settings_nvs);
+
+    if (setup_cb) setup_cb(client, settings_nvs);
+    printf("websocket event loop start...\n");
+    while(!wifi_websocket_client_app_exited) {
+        //printf("loop_cb...\n");
+        if (loop_cb) loop_cb(client);
+    }
+    printf("wifi_websocket_client_app_stop...\n");
+    wifi_websocket_client_app_stop(client);
     free(settings_nvs);
 }
 
 /************************ MOTION **************************/
 
-void motion_sensor() {
-    wifi_wesocket_client_app_boilerplate();
-    printf("MOTION DETECTOR START\n");
-    while(1); // TODO: main loop here
+void motion_sensor_setup(esp_websocket_client_handle_t client, char* settings_nvs) {
+    printf("MOTION DETECTOR SETUP...\n");
+}
+
+void motion_sensor_loop(esp_websocket_client_handle_t client) {
+    //printf("MOTION DETECTOR LOOP...\n");
+}
+
+void motion_sensor_data(esp_websocket_client_handle_t client, esp_websocket_event_data_t *data) {
+    printf("MOTION DETECTOR DATA RECEIVED: '%s'\n", data->data_ptr);
+}
+
+void motion_sensor_connected(esp_websocket_client_handle_t client) {
+    printf("MOTION DETECTOR CONNECTED.\n");
+    char macbuf[40];
+    wifi_websocket_client_app_printf(client, "HELLO MOTION %s", get_mac_addr(macbuf, sizeof(macbuf)));
+}
+
+void motion_sensor_disconnected(esp_websocket_client_handle_t client) {
+    printf("MOTION DETECTOR DISCONNECTED.\n");
+}
+
+void motion_sensor_error(esp_websocket_client_handle_t client) {
+    printf("MOTION DETECTOR ERROR.\n");
 }
 
 /************************ CAMERA **************************/
 
-void camera_recorder() {
-    wifi_wesocket_client_app_boilerplate();
-    printf("CAMERA RECORDER START\n");
-    while(1); // TODO: main loop here
+void camera_recorder_setup(esp_websocket_client_handle_t client, char* settings_nvs) {
+    printf("CAMERA RECORDER SETUP...\n");
+    char macbuf[40];
+    wifi_websocket_client_app_printf(client, "HELLO CAMERA %s", get_mac_addr(macbuf, sizeof(macbuf)));
 }
+
+void camera_recorder_loop(esp_websocket_client_handle_t client) {
+    printf("CAMERA RECORDER LOOP...\n");
+}
+
+void camera_recorder_data(esp_websocket_client_handle_t client, esp_websocket_event_data_t *data) {
+    printf("CAMERA RECORDER DATA RECEIVED: '%s'\n", data->data_ptr);
+}
+
+void camera_recorder_connected(esp_websocket_client_handle_t client) {
+    printf("CAMERA RECORDER CONNECTED.\n");
+}
+
+void camera_recorder_disconnected(esp_websocket_client_handle_t client) {
+    printf("CAMERA RECORDER DISCONNECTED.\n");
+}
+
+void camera_recorder_error(esp_websocket_client_handle_t client) {
+    printf("CAMERA RECORDER ERROR.\n");
+}
+
+/************************ MAIN TASK **************************/
 
 static void main_task() {
     gpio_config_t io_conf;
@@ -638,8 +791,8 @@ static void main_task() {
     int motion_button_state = !gpio_get_level(GPIO_NUM_12);
     int camera_button_state = !gpio_get_level(GPIO_NUM_13);
     
-    if (motion_button_state) motion_sensor();
-    else if (camera_button_state) camera_recorder();
+    if (motion_button_state) wifi_websocket_client_app_start(motion_sensor_setup, motion_sensor_loop, motion_sensor_data, motion_sensor_connected, motion_sensor_disconnected, motion_sensor_error);
+    else if (camera_button_state) wifi_websocket_client_app_start(camera_recorder_setup, camera_recorder_loop, camera_recorder_data, camera_recorder_connected, camera_recorder_disconnected, camera_recorder_error);
     else wifi_setup();
 }
 

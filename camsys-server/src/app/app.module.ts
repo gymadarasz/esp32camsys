@@ -18,7 +18,7 @@ import { CameraServerComponent } from './camera-server/camera-server.component';
   imports: [
     BrowserModule,
     AppRoutingModule,
-    FormsModule
+    FormsModule,
   ],
   providers: [],
   bootstrap: [AppComponent]
