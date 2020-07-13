@@ -1,12 +1,10 @@
-<p>menu works!</p>
 <ul>
     <li (click)="selectedPage='deviceList'">Device List</li>
     <li (click)="selectedPage='deviceSetup'">Device Setup</li>
 </ul>
 <div *ngIf="selectedPage=='deviceList'">
-    [Device List here...]
+    <cam-device-list></cam-device-list>
 </div>
 <div *ngIf="selectedPage=='deviceSetup'">
-    [Device Setup Here..]
     <cam-device-setup></cam-device-setup>
 </div>

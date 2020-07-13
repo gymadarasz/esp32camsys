@@ -5,12 +5,14 @@ import { FormsModule } from '@angular/forms';
 import { AppComponent } from './app.component';
 import { MenuComponent } from './menu/menu.component';
 import { DeviceSetupComponent } from './device-setup/device-setup.component';
+import { DeviceListComponent } from './device-list/device-list.component';
 
 @NgModule({
   declarations: [
     AppComponent,
     MenuComponent,
-    DeviceSetupComponent
+    DeviceSetupComponent,
+    DeviceListComponent
   ],
   imports: [
     BrowserModule,

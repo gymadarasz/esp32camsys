@@ -1,0 +1,27 @@
+<label>Devices:<label>
+<ul>
+    <li *ngFor="let camDevice of camDeviceList.camDevices">
+        <label>ID:</label>
+        {{ camDevice.id }}
+        <br>
+
+        <label>Type:</label>
+        {{ camDevice.type }}
+        <br>
+
+        <label>Name:</label>
+        {{ camDevice.name }}
+        <br>
+
+        <label>Connected At:</label>
+        {{ camDevice.connectedAt }}
+        <br>
+
+        <label>Status:</label>
+        {{ camDevice.status }}
+        <br>
+        
+        <input type="button" value="Forget" (click)="onForgetClick(camDevice.id)">
+        <br>
+    </li>
+</ul>
