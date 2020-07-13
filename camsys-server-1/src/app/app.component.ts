@@ -1,10 +1,16 @@
 import { Component } from '@angular/core';
 
 @Component({
-  selector: 'cam-root',
+  selector: 'app-root',
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css']
 })
 export class AppComponent {
-  title = 'camsys-server';
+  title = 'camsys';
+  
+  constructor() {
+    console.log('hello123');
+    //debugger;
+    console.log('fooo');
+  }
 }
