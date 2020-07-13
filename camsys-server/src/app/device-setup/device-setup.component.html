@@ -15,7 +15,7 @@
 <br>
 
 <ul>
-    <li *ngFor="let wifiCredential of wifiCredentials">
+    <li *ngFor="let wifiCredential of wifiCredentials.getCredentials()">
         <span>{{ wifiCredential.ssid }}</span>
         <input type="button" value="Remove" (click)="onRemoveWifiCredentialsClick(wifiCredential.ssid)">
     </li>
@@ -28,7 +28,7 @@
 
 <label>COM Port</label>
 <select [(ngModel)]="comPortPath">
-    <option *ngFor="let comPort of comPorts" [ngValue="comPort.path"] [title]="comPort.info">{{ comPort.path }}</option>
+    <option *ngFor="let comPort of comPorts" [ngValue]="comPort.path" [title]="getComPortInfo(comPort)">{{ comPort.path }}</option>
 </select>
 <br>
 
