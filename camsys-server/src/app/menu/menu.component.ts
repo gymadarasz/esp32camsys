@@ -7,6 +7,8 @@ import { Component, OnInit } from '@angular/core';
 })
 export class MenuComponent implements OnInit {
 
+  selectedPage: string = 'deviceList';
+
   constructor() { }
 
   ngOnInit(): void {

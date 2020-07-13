@@ -1,0 +1,36 @@
+<p>device-setup works!</p>
+
+<label>Wifi</label>
+<br>
+
+<label>SSID</label>
+<input type="text" [(ngModel)]="wifiSSID">
+<br>
+
+<label>Password</label>
+<input type="password" [(ngModel)]="wifiPassword">
+<br>
+
+<input type="button" value="Add WIFI credentials.." (click)="onAddWifiCredentialsClick()">
+<br>
+
+<ul>
+    <li *ngFor="let wifiCredential of wifiCredentials">
+        <span>{{ wifiCredential.ssid }}</span>
+        <input type="button" value="Remove" (click)="onRemoveWifiCredentialsClick(wifiCredential.ssid)">
+    </li>
+</ul>
+<br>
+
+<label>Camera Server Host name or IP<label>
+<input type="text" [(ngModel)]="hostAddressOrIP">
+<br>
+
+<label>COM Port</label>
+<select [(ngModel)]="comPortPath">
+    <option *ngFor="let comPort of comPorts" [ngValue="comPort.path"] [title]="comPort.info">{{ comPort.path }}</option>
+</select>
+<br>
+
+<input type="button" value="Upload settings.." (click)="onUploadSettingsClick()" [disabled]="uploadSettingsDisabled">
+<br>
