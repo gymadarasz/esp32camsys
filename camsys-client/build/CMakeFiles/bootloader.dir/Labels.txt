@@ -1,0 +1,13 @@
+# Target labels
+ bootloader
+# Source files and their labels
+/home/gyula/Desktop/esp32camsys/camsys-client/build/CMakeFiles/bootloader
+/home/gyula/Desktop/esp32camsys/camsys-client/build/CMakeFiles/bootloader.rule
+/home/gyula/Desktop/esp32camsys/camsys-client/build/CMakeFiles/bootloader-complete.rule
+/home/gyula/Desktop/esp32camsys/camsys-client/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule
+/home/gyula/Desktop/esp32camsys/camsys-client/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule
+/home/gyula/Desktop/esp32camsys/camsys-client/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule
+/home/gyula/Desktop/esp32camsys/camsys-client/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule
+/home/gyula/Desktop/esp32camsys/camsys-client/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule
+/home/gyula/Desktop/esp32camsys/camsys-client/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule
+/home/gyula/Desktop/esp32camsys/camsys-client/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule

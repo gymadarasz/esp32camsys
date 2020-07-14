@@ -97,10 +97,12 @@ export class DeviceSetupComponent implements OnInit {
       return;
     }
 
-    let message = [
-      this.getWifiCredentialsMessage(),
-      this.getHostAddressOrIPWithProtocol(),
-    ].join('\n');
+    let message = 
+      'WIFI CREDENTIALS:\n' +
+      this.getWifiCredentialsMessage() + '\n' +
+      'HOST ADDRESS OR IP:\n' +
+      this.getHostAddressOrIPWithProtocol() + '\n' +
+      'COMMIT\n';
 
     // TODO: send message to selected port
     this.serialDeviceWriter.write(this.serialPort, this.readline, this.comPortPath, message, (result: string) => {

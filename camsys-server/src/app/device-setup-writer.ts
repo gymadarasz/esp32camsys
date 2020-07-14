@@ -26,12 +26,7 @@ export class DeviceSetupWriter {
         parser.on('data', (data: any) => {
             console.log('Serial input:' + data);
             port.close();
-            // check ECHO response to see if write success
-            if (data === 'ECHO:' + message) {
-                cb(data);
-            } else {
-                cbErr(data);
-            }
+            cb(data);
         });
 
         port.write(message, (err: any) => {
