@@ -3,6 +3,8 @@
 #include "esp_wifi.h"
 #include "esp_log.h"
 #include "esp_event.h"
+#include "esp_tls.h"
+#include "esp_http_client.h"
 #include "driver/uart.h"
 #include "driver/gpio.h"
 #include "nvs_flash.h"
@@ -255,15 +257,6 @@ void app_main_settings(nvs_handle_t nvs_handle)
 
     bool finish = false;
 
-/*
-WIFI CREDENTIALS:
-apucika:mad12345;apucika_EXT:mad12345
-HOST ADDRESS OR IP:
-ws://192.168.0.200:8080
-COMMIT
-
-*/
-
     const size_t reads_size = 500;
     char input[reads_size] = {0};
     char value[reads_size] = {0};
@@ -322,22 +315,24 @@ COMMIT
     PRINT("FINISHED");
 }
 
-/****************** MOTION MODE *****************/
+
+/****************** WIFI *****************/
+
 
 bool wifi_connected = false;
 static ip4_addr_t wifi_ip_addr;
 
 void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
-    PRINTF("WIFI: ***EVENT (%ld)", event_id);
+    //PRINTF("WIFI: ***EVENT (%ld)", event_id);
 
     if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        PRINT("WIFI: GOT IP");
+        //PRINT("WIFI: GOT IP");
         wifi_connected = true;
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
         memcpy(&wifi_ip_addr, &event->ip_info.ip, sizeof(wifi_ip_addr));
         ESP_ERROR_CHECK(esp_wifi_scan_stop());
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        PRINT("WIFI: DISCONNECTED");
+        //PRINT("WIFI: DISCONNECTED");
         wifi_connected = false;
         // int wifi_reconnect_attempts = 30;
         // while (!wifi_connected && wifi_reconnect_attempts) {
@@ -348,7 +343,7 @@ void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id
         // }
         esp_restart();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED) {
-        PRINT("WIFI: CONNECTED");
+        //PRINT("WIFI: CONNECTED");
     }
 }
 
@@ -379,7 +374,7 @@ bool wifi_connect_attempt(char* wifi_settings, char* ssid) {
     char pwd_buff[pwd_size];
     if (get_wifi_pwd(wifi_settings, ssid, pwd_buff, pwd_size)) {
         // TODO connect...
-        PRINTF("Attempt to connect to '%s'...", ssid);
+        //PRINTF("Attempt to connect to '%s'...", ssid);
         return wifi_connect(ssid, pwd_buff);
     }
     return false;
@@ -432,23 +427,125 @@ char* app_wifi_start(nvs_handle_t nvs_handle) {
     return wifi_settings;
 }
 
+/****************** MOTION MODE *****************/
+esp_err_t _http_event_handler(esp_http_client_event_t *evt)
+{
+    static char *output_buffer;  // Buffer to store response of http request from event handler
+    static int output_len;       // Stores number of bytes read
+    switch(evt->event_id) {
+        case HTTP_EVENT_ERROR:
+            ESP_LOGD("camsys", "HTTP_EVENT_ERROR");
+            break;
+        case HTTP_EVENT_ON_CONNECTED:
+            ESP_LOGD("camsys", "HTTP_EVENT_ON_CONNECTED");
+            break;
+        case HTTP_EVENT_HEADER_SENT:
+            ESP_LOGD("camsys", "HTTP_EVENT_HEADER_SENT");
+            break;
+        case HTTP_EVENT_ON_HEADER:
+            ESP_LOGD("camsys", "HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
+            break;
+        case HTTP_EVENT_ON_DATA:
+            ESP_LOGD("camsys", "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+            /*
+             *  Check for chunked encoding is added as the URL for chunked encoding used in this example returns binary data.
+             *  However, event handler can also be used in case chunked encoding is used.
+             */
+            if (!esp_http_client_is_chunked_response(evt->client)) {
+                // If user_data buffer is configured, copy the response into the buffer
+                if (evt->user_data) {
+                    memcpy((char*)evt->user_data + output_len, evt->data, evt->data_len);
+                } else {
+                    if (output_buffer == NULL) {
+                        output_buffer = (char *) malloc(esp_http_client_get_content_length(evt->client));
+                        output_len = 0;
+                        if (output_buffer == NULL) {
+                            ESP_LOGE("camsys", "Failed to allocate memory for output buffer");
+                            return ESP_FAIL;
+                        }
+                    }
+                    memcpy(output_buffer + output_len, evt->data, evt->data_len);
+                }
+                output_len += evt->data_len;
+            }
+
+            break;
+        case HTTP_EVENT_ON_FINISH:
+            ESP_LOGD("camsys", "HTTP_EVENT_ON_FINISH");
+            if (output_buffer != NULL) {
+                // Response is accumulated in output_buffer. Uncomment the below line to print the accumulated response
+                ESP_LOG_BUFFER_HEX("camsys", output_buffer, output_len);
+                free(output_buffer);
+                output_buffer = NULL;
+            }
+            output_len = 0;
+            break;
+        case HTTP_EVENT_DISCONNECTED:
+            ESP_LOGI("camsys", "HTTP_EVENT_DISCONNECTED");
+            int mbedtls_err = 0;
+            esp_err_t err = esp_tls_get_and_clear_last_error((esp_tls_error_handle_t)evt->data, &mbedtls_err, NULL);
+            if (err != 0) {
+                if (output_buffer != NULL) {
+                    free(output_buffer);
+                    output_buffer = NULL;
+                }
+                output_len = 0;
+                ESP_LOGI("camsys", "Last esp error code: 0x%x", err);
+                ESP_LOGI("camsys", "Last mbedtls failure: 0x%x", mbedtls_err);
+            }
+            break;
+    }
+    return ESP_OK;
+}
+
+bool http_request(esp_http_client_method_t method, const char* url, const char* post_data, http_event_handle_cb event_handler) {
+    esp_http_client_config_t config = {
+        .url = url,
+        .method = method,
+    };
+    if (event_handler) config.event_handler = event_handler;
+
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    //esp_http_client_set_url(client, url);
+    esp_http_client_set_method(client, method);
+    //if (method == HTTP_METHOD_POST) 
+        esp_http_client_set_post_field(client, post_data, strlen(post_data));
+    
+
+    esp_err_t err = esp_http_client_perform(client);
+    if (err == ESP_OK) {
+        ESP_LOGI("camsys", "HTTP POST Status = %d, content_length = %d",
+                esp_http_client_get_status_code(client),
+                esp_http_client_get_content_length(client));
+        return true;
+    } else {
+        ESP_LOGE("camsys", "HTTP POST request failed: %s", esp_err_to_name(err));
+        return false;
+    }
+
+    esp_http_client_cleanup(client);
+}
+
 void app_main_motion(nvs_handle_t nvs_handle) {
     char* wifi_settings = app_wifi_start(nvs_handle);
+    
+    char* host = nvs_gets(nvs_handle, "host");
+    char* secret = nvs_gets(nvs_handle, "secret");
 
+    http_request(HTTP_METHOD_POST, "http://192.168.0.200:3000", "", _http_event_handler);
     int counter = 0;
     while(1) {
         PRINTF("counter:%d", counter++);
         vTaskDelay(1000 / portTICK_RATE_MS);
     }
 
+    free(secret);
+    free(host);
+
     free(wifi_settings);
 }
 
 /****************** MAIN *****************/
-
-class Camsys {
-    
-};
 
 
 extern "C" void app_main()

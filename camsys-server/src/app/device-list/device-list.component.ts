@@ -54,6 +54,11 @@ export class DeviceListComponent implements OnInit {
     if (!this.httpServerApp) {
       this.httpServerApp = caller.express();
 
+      this.httpServerApp.post('', (req: any, res: any) => {
+        console.log("POST", req, res);
+        res.send('HELLO POSTER');
+      });
+
       this.httpServerApp.get('/join/:id', (req: any, res: any) => {
         caller.camDeviceList.joinDevice(req.params.id);
         console.log(caller.camDeviceList);
