@@ -46,27 +46,33 @@ class CamDeviceList {
 })
 export class DeviceListComponent implements OnInit {
 
+  static readonly port = 3000;
+
   camDeviceList: CamDeviceList = new CamDeviceList();
   express = this.require.import('express');
+  bodyParser = this.require.import('body-parser');
   static httpServerApp: any = null;
 
   static getHttpServerApp(caller: DeviceListComponent) {
     if (!this.httpServerApp) {
       this.httpServerApp = caller.express();
+      this.httpServerApp.use(caller.bodyParser.urlencoded({
+        extended: true,
+      }));
 
-      this.httpServerApp.post('', (req: any, res: any) => {
+      this.httpServerApp.post('/join', (req: any, res: any) => {
         console.log("POST", req, res);
         res.send('HELLO POSTER');
       });
 
-      this.httpServerApp.get('/join/:id', (req: any, res: any) => {
-        caller.camDeviceList.joinDevice(req.params.id);
-        console.log(caller.camDeviceList);
-        caller.refreshDeviceList();
+      // this.httpServerApp.get('/join/:id', (req: any, res: any) => {
+      //   caller.camDeviceList.joinDevice(req.params.id);
+      //   console.log(caller.camDeviceList);
+      //   caller.refreshDeviceList();
 
-        res.send('ATTACHED');
-      });
-      this.httpServerApp.listen(3000);
+      //   res.send('ATTACHED');
+      // });
+      this.httpServerApp.listen(DeviceListComponent.port);
     }
     return this.httpServerApp;
   }

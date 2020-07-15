@@ -4,6 +4,7 @@ import { ComPort } from '../com-port';
 import { WifiCredentialList } from '../wifi-credential-list';
 import { WifiCredential } from '../wifi-credential';
 import { DeviceSetupWriter } from '../device-setup-writer';
+import { DeviceListComponent } from '../device-list/device-list.component';
 
 @Component({
   selector: 'cam-device-setup',
@@ -15,7 +16,7 @@ export class DeviceSetupComponent implements OnInit {
   wifiSSID: string;
   wifiPassword: string;
   wifiCredentials: WifiCredentialList;
-  hostAddressOrIP: string = this.getHostAddressOrIPWithProtocol();
+  hostAddressOrIP: string = this.getHostAddressOrIP();
   comPortPath: string = '';
   comPorts: ComPort[] = [];
   uploadSettingsDisabled: boolean = false;
@@ -100,12 +101,12 @@ export class DeviceSetupComponent implements OnInit {
     }
 
     let message = 
-      'WIFI CREDENTIALS:\n' +
-      this.getWifiCredentialsMessage() + '\n' +
-      'HOST ADDRESS OR IP:\n' +
-      this.getHostAddressOrIPWithProtocol() + '\n' +
-      'SECRET\n' +
-      this.getSecret() + '\n' +
+      'UID STRING:\n' + this.getRandomToken(32)  + '\n' +
+      'WIFI CREDENTIALS:\n' + this.getWifiCredentialsMessage() + '\n' +
+      'HOST ADDRESS OR IP:\n' + this.getHostAddressOrIP() + '\n' +
+      'SECRET:\n' + this.getSecret() + '\n' +
+      'HTTP PREFIX:\n' + 'http'  + '\n' +
+      'HTTP PORT:\n' + DeviceListComponent.port  + '\n' +
       'COMMIT\n';
 
     // TODO: secret key send to client devices to identify each cameras in system
@@ -135,7 +136,7 @@ export class DeviceSetupComponent implements OnInit {
   }
 
 
-  private getHostAddressOrIPWithProtocol(): string {
+  private getHostAddressOrIP(): string {
     let os = this.require.import('os');
     let interfaces = os.networkInterfaces();
     let addresses = [];
@@ -143,7 +144,7 @@ export class DeviceSetupComponent implements OnInit {
       for (let k2 in interfaces[k]) {
         let address = interfaces[k][k2];
         if (address.family === 'IPv4' && !address.internal) {
-          addresses.push('http://' + address.address + ':3000');
+          addresses.push(address.address);
         }
       }
     }

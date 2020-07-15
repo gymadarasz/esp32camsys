@@ -150,6 +150,13 @@ void nvs_init(nvs_handle_t* nvs_handle) {
     ESP_ERROR_CHECK( nvs_open("storage", NVS_READWRITE, nvs_handle) );
 }
 
+uint16_t nvs_getu16(nvs_handle_t nvs_handle, const char* key, uint16_t default_value) {
+    uint16_t out_value = default_value;
+    esp_err_t err = nvs_get_u16(nvs_handle, key, &out_value);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) ESP_ERROR_CHECK(err);
+    return out_value;
+}
+
 char* nvs_gets(nvs_handle_t nvs_handle, const char* key) {
     size_t stored_value_size = 100;
     char* value_buff = (char*)malloc(sizeof(char) * stored_value_size);
@@ -167,6 +174,12 @@ char* nvs_gets(nvs_handle_t nvs_handle, const char* key) {
     return value_buff;
 }
 
+void nvs_setu16(nvs_handle_t nvs_handle, const char* key, uint16_t value) {
+    esp_err_t err = nvs_set_u16(nvs_handle, key, value);
+    if (err != ESP_OK) nvs_close(nvs_handle);
+    ESP_ERROR_CHECK(err);
+}
+
 void nvs_sets(nvs_handle_t nvs_handle, const char* key, const char* valstr) {
     esp_err_t err = nvs_set_str(nvs_handle, key, valstr);
     if (err != ESP_OK) nvs_close(nvs_handle);
@@ -181,6 +194,13 @@ void nvs_store(nvs_handle_t nvs_handle) {
 
 
 // --------
+
+
+bool settings_validate_uids(char* value, bool halt) {
+    if (NULL == value || value[0] == '\0') return halt ? ERROR("Value is missing.") : false;
+    if (strlen(value) != 32) return halt ? ERROR("Incorrect UIDS length.") : false;
+    return true;
+}
 
 bool settings_validate_wifi_credentials(char* value, bool halt) {
     if (NULL == value || value[0] == '\0')
@@ -198,6 +218,14 @@ bool settings_validate_wifi_credentials(char* value, bool halt) {
 
 bool settings_validate_required(char* value, bool halt) {
     if (NULL == value || value[0] == '\0') return halt ? ERROR("Value is missing.") : false;
+    return true;
+}
+
+bool settings_validate_numeric(char* value, bool halt) {
+    size_t len = strlen(value);
+    for (size_t i=0; i<len; i++) {
+        if (value[i] < '0' || value[i] > '9') return halt ? ERROR("Value is not numeric.") : false;
+    }
     return true;
 }
 
@@ -265,7 +293,18 @@ void app_main_settings(nvs_handle_t nvs_handle)
         input[0] = 0;
         reads(input, reads_size);
         
-        if (!strcmp(input, "WIFI CREDENTIALS:")) {
+        if (!strcmp(input, "UID STRING:")) {
+
+            reads(value, reads_size);
+
+            if (!settings_validate_uids(value, false)) {
+                PRINT("Invalid UIDS format.");
+            } else {
+                nvs_sets(nvs_handle, "uids", value);
+                PRINT("UIDS accepted.");
+            }
+
+        } else if (!strcmp(input, "WIFI CREDENTIALS:")) {
 
             reads(value, reads_size);
 
@@ -287,7 +326,7 @@ void app_main_settings(nvs_handle_t nvs_handle)
                 PRINT("Host address is accepted.");
             }
 
-        }  else if (!strcmp(input, "SECRET:")) {
+        } else if (!strcmp(input, "SECRET:")) {
 
             reads(value, reads_size);
 
@@ -296,6 +335,29 @@ void app_main_settings(nvs_handle_t nvs_handle)
             } else {
                 nvs_sets(nvs_handle, "secret", value);
                 PRINT("Secret is accepted.");
+            }
+
+        } else if (!strcmp(input, "HTTP PREFIX:")) {
+
+            reads(value, reads_size);
+
+            if (!settings_validate_required(value, false)) {
+                PRINT("Invalid http prefix format.");
+            } else {
+                nvs_sets(nvs_handle, "http_prefix", value);
+                PRINT("Http prefix is accepted.");
+            }
+
+        } else if (!strcmp(input, "HTTP PORT:")) {
+
+            reads(value, reads_size);
+
+            if (!settings_validate_required(value, false) || !settings_validate_numeric(value, false) ) {
+                PRINT("Invalid http port format.");
+            } else {
+                uint16_t value_u16 = atoi(value);
+                nvs_setu16(nvs_handle, "http_prefix", value_u16);
+                PRINT("Http port is accepted.");
             }
 
         } else if (!strcmp(input, "COMMIT")) {
@@ -428,6 +490,11 @@ char* app_wifi_start(nvs_handle_t nvs_handle) {
 }
 
 /****************** MOTION MODE *****************/
+
+typedef void (*http_response_handler_t)(char* buff, size_t size);
+
+http_response_handler_t _http_response_handler = NULL;
+
 esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 {
     static char *output_buffer;  // Buffer to store response of http request from event handler
@@ -435,18 +502,23 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
     switch(evt->event_id) {
         case HTTP_EVENT_ERROR:
             ESP_LOGD("camsys", "HTTP_EVENT_ERROR");
+            PRINT("HTTP ERROR");
             break;
         case HTTP_EVENT_ON_CONNECTED:
             ESP_LOGD("camsys", "HTTP_EVENT_ON_CONNECTED");
+            PRINT("HTTP ON CONNECTED");
             break;
         case HTTP_EVENT_HEADER_SENT:
             ESP_LOGD("camsys", "HTTP_EVENT_HEADER_SENT");
+            PRINT("HTTP HEADER SENT");
             break;
         case HTTP_EVENT_ON_HEADER:
             ESP_LOGD("camsys", "HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
+            PRINT("HTTP ON HEADER");
             break;
         case HTTP_EVENT_ON_DATA:
             ESP_LOGD("camsys", "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+            PRINT("HTTP ON DATA");
             /*
              *  Check for chunked encoding is added as the URL for chunked encoding used in this example returns binary data.
              *  However, event handler can also be used in case chunked encoding is used.
@@ -457,7 +529,7 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
                     memcpy((char*)evt->user_data + output_len, evt->data, evt->data_len);
                 } else {
                     if (output_buffer == NULL) {
-                        output_buffer = (char *) malloc(esp_http_client_get_content_length(evt->client));
+                        output_buffer = (char *) calloc(esp_http_client_get_content_length(evt->client) + 1, sizeof(char));
                         output_len = 0;
                         if (output_buffer == NULL) {
                             ESP_LOGE("camsys", "Failed to allocate memory for output buffer");
@@ -472,9 +544,11 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
             break;
         case HTTP_EVENT_ON_FINISH:
             ESP_LOGD("camsys", "HTTP_EVENT_ON_FINISH");
+            PRINT("HTTP ON FINISH");
             if (output_buffer != NULL) {
                 // Response is accumulated in output_buffer. Uncomment the below line to print the accumulated response
-                ESP_LOG_BUFFER_HEX("camsys", output_buffer, output_len);
+                // ESP_LOG_BUFFER_HEX("camsys", output_buffer, output_len);
+                if (_http_response_handler) _http_response_handler(output_buffer, output_len);
                 free(output_buffer);
                 output_buffer = NULL;
             }
@@ -482,6 +556,7 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
             break;
         case HTTP_EVENT_DISCONNECTED:
             ESP_LOGI("camsys", "HTTP_EVENT_DISCONNECTED");
+            PRINT("HTTP DISCONNECTED");
             int mbedtls_err = 0;
             esp_err_t err = esp_tls_get_and_clear_last_error((esp_tls_error_handle_t)evt->data, &mbedtls_err, NULL);
             if (err != 0) {
@@ -498,49 +573,104 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
     return ESP_OK;
 }
 
-bool http_request(esp_http_client_method_t method, const char* url, const char* post_data, http_event_handle_cb event_handler) {
-    esp_http_client_config_t config = {
-        .url = url,
-        .method = method,
-    };
-    if (event_handler) config.event_handler = event_handler;
+// TODO: may it should be in the esp-idf lib folder as a macro just like `wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();`, (see at esp_wifi.h) later on mey I will create a pull request?
+
+#define HTTP_CLIENT_CONFIG_DEFAULT(URL) {\
+    .url = URL,\
+    .host = NULL,\
+    .port = 0,\
+    .username = NULL,\
+    .password = NULL,\
+    .auth_type = HTTP_AUTH_TYPE_NONE,\
+    .path = NULL,\
+    .query = NULL,\
+    .cert_pem = NULL,\
+    .client_cert_pem = NULL,\
+    .client_key_pem = NULL,\
+    .method = HTTP_METHOD_GET,\
+    .timeout_ms = 0,\
+    .disable_auto_redirect = false,\
+    .max_redirection_count = 0,\
+    .max_authorization_retries = 0,\
+    .event_handler = NULL,\
+    .transport_type = HTTP_TRANSPORT_UNKNOWN,\
+    .buffer_size = 0,\
+    .buffer_size_tx = 0,\
+    .user_data = NULL,\
+    .is_async = false,\
+    .use_global_ca_store = false,\
+    .skip_cert_common_name_check = false,\
+};
+
+
+bool http_request(
+    esp_http_client_method_t method, const char* url, const char* post_data,
+    http_response_handler_t response_handler
+) {
+    esp_http_client_config_t config = HTTP_CLIENT_CONFIG_DEFAULT(url);
+    config.method = method;
+    config.event_handler = _http_event_handler;
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
-    //esp_http_client_set_url(client, url);
     esp_http_client_set_method(client, method);
-    //if (method == HTTP_METHOD_POST) 
-        esp_http_client_set_post_field(client, post_data, strlen(post_data));
+    esp_http_client_set_post_field(client, post_data, strlen(post_data));
     
 
+    PRINT("HTTP PERFOM...");
+    _http_response_handler = response_handler;
     esp_err_t err = esp_http_client_perform(client);
+    PRINT("HTTP PERFORMED.");
     if (err == ESP_OK) {
         ESP_LOGI("camsys", "HTTP POST Status = %d, content_length = %d",
                 esp_http_client_get_status_code(client),
                 esp_http_client_get_content_length(client));
-        return true;
     } else {
         ESP_LOGE("camsys", "HTTP POST request failed: %s", esp_err_to_name(err));
-        return false;
     }
 
     esp_http_client_cleanup(client);
+    return err == ESP_OK;
+}
+
+void app_http_response_handler(char* buff, size_t size) {
+    PRINTF("RESPONSE STRING LENGTH: %d, BUFF_SIZE: %d", strlen(buff), size);
+}
+
+bool app_http_request_join(nvs_handle_t nvs_handle) {
+    const size_t strmax = 255;
+    char url[strmax];
+    char post_data[strmax];
+
+    char* uids = nvs_gets(nvs_handle, "uids"); // TODO add to settings
+    char* host = nvs_gets(nvs_handle, "host");
+    char* http_prefix = nvs_gets(nvs_handle, "http_prefix"); // TODO add to settings
+    uint16_t http_port = nvs_getu16(nvs_handle, "http_port", 3000); // TODO add to settings
+    char* secret = nvs_gets(nvs_handle, "secret");
+
+    snprintf(url, strmax, "%s://%s:%d/join", http_prefix, host, http_port);
+    snprintf(post_data, strmax, "client=%s&secret=%s", uids, secret);
+
+    bool ret = http_request(HTTP_METHOD_POST, url, post_data, app_http_response_handler);
+
+    free(secret);
+    free(http_prefix);
+    free(host);
+    free(uids);
+
+    return ret;
 }
 
 void app_main_motion(nvs_handle_t nvs_handle) {
     char* wifi_settings = app_wifi_start(nvs_handle);
     
-    char* host = nvs_gets(nvs_handle, "host");
-    char* secret = nvs_gets(nvs_handle, "secret");
+    app_http_request_join(nvs_handle);
 
-    http_request(HTTP_METHOD_POST, "http://192.168.0.200:3000", "", _http_event_handler);
     int counter = 0;
     while(1) {
         PRINTF("counter:%d", counter++);
         vTaskDelay(1000 / portTICK_RATE_MS);
     }
 
-    free(secret);
-    free(host);
 
     free(wifi_settings);
 }
