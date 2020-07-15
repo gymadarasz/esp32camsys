@@ -2,7 +2,7 @@ export class DeviceSetupWriter {
 
     private baudrate = 115200;
 
-    write(serialPort: any, readLine: any, comPortPath: string, message: string, cb: Function, cbErr: Function) {
+    write(serialPort: any, readLine: any, comPortPath: string, message: string, cb: Function, cbErr: Function): any {
         let result: '';
 
         let port = new serialPort(comPortPath, {
@@ -34,9 +34,10 @@ export class DeviceSetupWriter {
                 cbErr(err.message);
             }
             console.log('message written');
-
+            cb();
         });
 
+        return port;
     }
 }
 

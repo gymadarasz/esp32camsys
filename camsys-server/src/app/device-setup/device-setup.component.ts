@@ -104,12 +104,16 @@ export class DeviceSetupComponent implements OnInit {
       this.getHostAddressOrIPWithProtocol() + '\n' +
       'COMMIT\n';
 
+    // TODO: secret key send to client devices to identify each cameras in system
+
     // TODO: send message to selected port
-    this.serialDeviceWriter.write(this.serialPort, this.readline, this.comPortPath, message, (result: string) => {
+    let port = this.serialDeviceWriter.write(this.serialPort, this.readline, this.comPortPath, message, (result: string) => {
       this.showMessage(result);
+      port.close();
       this.uploadSettingsDisabled = false;
     }, (err: string) => {
       this.showError(err);
+      console.log('PORT ERROR', err, port);
       this.uploadSettingsDisabled = false;
     });
 
@@ -135,7 +139,7 @@ export class DeviceSetupComponent implements OnInit {
       for (let k2 in interfaces[k]) {
         let address = interfaces[k][k2];
         if (address.family === 'IPv4' && !address.internal) {
-          addresses.push('ws://' + address.address + ':8080');
+          addresses.push('http://' + address.address + ':3000');
         }
       }
     }

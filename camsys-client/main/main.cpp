@@ -40,8 +40,10 @@ void debugln(int line, const char* msg) {
     printf("DEBUG at line %d: %s", line, msg);
 }
 
+const size_t print_buffer_size = 1000;
+
 void printlnf(const char* fmt, ...) {
-    char buffer[4096] = {0};
+    char buffer[print_buffer_size] = {0};
     va_list args;
     va_start(args, fmt);
     vsnprintf(buffer, sizeof(buffer), fmt, args);
@@ -51,7 +53,7 @@ void printlnf(const char* fmt, ...) {
 }
 
 bool errorlnf(int line, const char* fmt, ...) {
-    char buffer[4096] = {0};
+    char buffer[print_buffer_size] = {0};
     va_list args;
     va_start(args, fmt);
     vsnprintf(buffer, sizeof(buffer), fmt, args);
@@ -64,7 +66,7 @@ bool errorlnf(int line, const char* fmt, ...) {
 }
 
 void debuglnf(int line, const char* fmt, ...) {
-    char buffer[4096] = {0};
+    char buffer[print_buffer_size] = {0};
     va_list args;
     va_start(args, fmt);
     vsnprintf(buffer, sizeof(buffer), fmt, args);
@@ -78,15 +80,11 @@ void stop(const char* msg) {
     esp_restart();
 }
 
-const size_t reads_size = 1000;
-
-char* reads(size_t size) {
-    char* buff = (char*)malloc(sizeof(char) * size);
-    if (!buff) ERRORF("Memory allocation of %ld chars error.", size);
+char* reads(char* buff, size_t size) {
+    //char* buff = (char*)malloc(sizeof(char) * size);
+    //if (!buff) ERRORF("Memory allocation of %ld chars error.", size);
     if (!fgets(buff, size, stdin)) ERROR("Read error.");
-    int i=0;
-    while (buff[i] != '\n' && buff[i] != '\r' && buff[i] != '\0') i++;
-    buff[i] = '\0';
+    buff[strlen(buff)-1] = '\0';
     return buff;
 }
 
@@ -253,33 +251,47 @@ void gpio_pins_init() {
 
 void app_main_settings(nvs_handle_t nvs_handle)
 {
-    //PRINT("WAITING FOR CAMSYS SETTINGS...");
+    PRINT("WAITING FOR CAMSYS SETTINGS...");
 
     bool finish = false;
 
-    int i=0, log_size = 100;
-    char* log[log_size];
+/*
+WIFI CREDENTIALS:
+apucika:mad12345;apucika_EXT:mad12345
+HOST ADDRESS OR IP:
+ws://192.168.0.200:8080
+COMMIT
+
+*/
+
+    const size_t reads_size = 500;
+    char input[reads_size] = {0};
+    char value[reads_size] = {0};
 
     while (!finish) {
-        char* input = reads(reads_size);
-        char* value = reads(reads_size);
+        input[0] = 0;
+        reads(input, reads_size);
         
         if (!strcmp(input, "WIFI CREDENTIALS:")) {
 
+            reads(value, reads_size);
+
             if (!settings_validate_wifi_credentials(value, false)) {
-                PRINT("Invalid WiFi credentials format.");
+                PRINTF("Invalid WiFi credentials format. (%s)", value);
             } else {
                 nvs_sets(nvs_handle, "wifi", value);
-                PRINT("Wifi credentials are accepted.");
+                PRINTF("Wifi credentials are accepted. (%s)", value);
             }
 
         } else if (!strcmp(input, "HOST ADDRESS OR IP:")) {
 
+            reads(value, reads_size);
+
             if (!settings_validate_host(value, false)) {
-                PRINT("Invalid host address format.");
+                PRINTF("Invalid host address format. (%s)", value);
             } else {
                 nvs_sets(nvs_handle, "host", value);
-                PRINT("Host address is accepted.");
+                PRINTF("Host address is accepted. (%s)", value);
             }
 
         } else if (!strcmp(input, "COMMIT")) {
@@ -289,16 +301,11 @@ void app_main_settings(nvs_handle_t nvs_handle)
             PRINT("Settings are saved.");
 
         } else {
-            PRINTF("Wrong settings argument: '%s'", input);
+            PRINTF("Wrong settings argument: (%s)", input);
         }
 
-        log[i] = value; i++; 
-        log[i] = input; i++;
-
-        if (i>=log_size-2) finish = true;
     }
 
-    for (int j=0; j<i; j++) free(log[j]);
 
 
     PRINT("FINISHED");
