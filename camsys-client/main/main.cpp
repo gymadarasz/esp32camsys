@@ -194,8 +194,8 @@ bool settings_validate_wifi_credentials(char* value, bool halt) {
     return true;
 }
 
-bool settings_validate_host(char* value, bool halt) {
-    if (NULL == value || value[0] == '\0') return halt ? ERROR("Host settings are missing.") : false;
+bool settings_validate_required(char* value, bool halt) {
+    if (NULL == value || value[0] == '\0') return halt ? ERROR("Value is missing.") : false;
     return true;
 }
 
@@ -277,21 +277,32 @@ COMMIT
             reads(value, reads_size);
 
             if (!settings_validate_wifi_credentials(value, false)) {
-                PRINTF("Invalid WiFi credentials format. (%s)", value);
+                PRINT("Invalid WiFi credentials format.");
             } else {
                 nvs_sets(nvs_handle, "wifi", value);
-                PRINTF("Wifi credentials are accepted. (%s)", value);
+                PRINT("Wifi credentials are accepted.");
             }
 
         } else if (!strcmp(input, "HOST ADDRESS OR IP:")) {
 
             reads(value, reads_size);
 
-            if (!settings_validate_host(value, false)) {
-                PRINTF("Invalid host address format. (%s)", value);
+            if (!settings_validate_required(value, false)) {
+                PRINT("Invalid host address format.");
             } else {
                 nvs_sets(nvs_handle, "host", value);
-                PRINTF("Host address is accepted. (%s)", value);
+                PRINT("Host address is accepted.");
+            }
+
+        }  else if (!strcmp(input, "SECRET:")) {
+
+            reads(value, reads_size);
+
+            if (!settings_validate_required(value, false)) {
+                PRINT("Invalid secret format.");
+            } else {
+                nvs_sets(nvs_handle, "secret", value);
+                PRINT("Secret is accepted.");
             }
 
         } else if (!strcmp(input, "COMMIT")) {
@@ -313,15 +324,63 @@ COMMIT
 
 /****************** MOTION MODE *****************/
 
+bool wifi_connected = false;
+static ip4_addr_t wifi_ip_addr;
 
+void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
+    PRINTF("WIFI: ***EVENT (%ld)", event_id);
 
+    if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        PRINT("WIFI: GOT IP");
+        wifi_connected = true;
+        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+        memcpy(&wifi_ip_addr, &event->ip_info.ip, sizeof(wifi_ip_addr));
+        ESP_ERROR_CHECK(esp_wifi_scan_stop());
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        PRINT("WIFI: DISCONNECTED");
+        wifi_connected = false;
+        // int wifi_reconnect_attempts = 30;
+        // while (!wifi_connected && wifi_reconnect_attempts) {
+        //     wifi_reconnect_attempts--;
+        //     PRINTF("WIFI: RECONNECT ATTEMPTS: %d", wifi_reconnect_attempts);
+        //     esp_wifi_connect();
+        //     vTaskDelay(3000 / portTICK_RATE_MS);
+        // }
+        esp_restart();
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED) {
+        PRINT("WIFI: CONNECTED");
+    }
+}
 
+bool wifi_connect(const char* ssid, const char* pwd) {
+
+    wifi_config_t wifi_config;
+    //wifi_config.sta.ssid[0] = '\0';
+    //wifi_config.sta.password[0] = '\0';
+    wifi_config.sta.bssid_set = 0;
+    wifi_config.sta.pmf_cfg.required = false;
+
+    strncpy((char*)wifi_config.sta.ssid, ssid, 32);
+    strncpy((char*)wifi_config.sta.password, pwd, 64);
+    
+    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
+    ESP_ERROR_CHECK(esp_wifi_connect());
+    
+    //vTaskDelay(3000 / portTICK_RATE_MS);
+    while (!wifi_connected) vTaskDelay(300 / portTICK_RATE_MS); //return false;
+
+    PRINTF("Connected to %s", ssid);
+    PRINTF("IPv4 address: " IPSTR, IP2STR(&wifi_ip_addr));
+    return true;
+}
 
 bool wifi_connect_attempt(char* wifi_settings, char* ssid) {
     size_t pwd_size = 64;
     char pwd_buff[pwd_size];
     if (get_wifi_pwd(wifi_settings, ssid, pwd_buff, pwd_size)) {
         // TODO connect...
+        PRINTF("Attempt to connect to '%s'...", ssid);
+        return wifi_connect(ssid, pwd_buff);
     }
     return false;
 }
@@ -337,6 +396,9 @@ bool wifi_scan_connect(char* wifi_settings)
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
+    ESP_ERROR_CHECK( esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL) );
+    ESP_ERROR_CHECK( esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL) );
+
     const int default_scan_list_size = 3;
     uint16_t number = default_scan_list_size;
     wifi_ap_record_t ap_info[default_scan_list_size];
@@ -349,11 +411,11 @@ bool wifi_scan_connect(char* wifi_settings)
     ESP_ERROR_CHECK(esp_wifi_scan_start(NULL, true));
     ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&number, ap_info));
     ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
-    ESP_LOGI("cansys", "Total APs scanned = %u", ap_count);
+    ESP_LOGI("camsys", "Total APs scanned = %u", ap_count);
     for (int i = 0; (i < default_scan_list_size) && (i < ap_count); i++) {
-        ESP_LOGI("cansys", "SSID \t\t%s", ap_info[i].ssid);
-        ESP_LOGI("cansys", "RSSI \t\t%d", ap_info[i].rssi);        
-        ESP_LOGI("cansys", "Channel \t\t%d\n", ap_info[i].primary);
+        ESP_LOGI("camsys", "SSID \t\t%s", ap_info[i].ssid);
+        ESP_LOGI("camsys", "RSSI \t\t%d", ap_info[i].rssi);        
+        ESP_LOGI("camsys", "Channel \t\t%d\n", ap_info[i].primary);
 
         if (wifi_connect_attempt(wifi_settings, (char*)ap_info[i].ssid)) {
             return true;
@@ -363,12 +425,21 @@ bool wifi_scan_connect(char* wifi_settings)
     return false;
 }
 
-
-void app_main_motion(nvs_handle_t nvs_handle) {
+char* app_wifi_start(nvs_handle_t nvs_handle) {
     char* wifi_settings = nvs_gets(nvs_handle, "wifi");
     settings_validate_wifi_credentials(wifi_settings, true);
-
     if (!wifi_scan_connect(wifi_settings)) ERROR("WIFI connect error");
+    return wifi_settings;
+}
+
+void app_main_motion(nvs_handle_t nvs_handle) {
+    char* wifi_settings = app_wifi_start(nvs_handle);
+
+    int counter = 0;
+    while(1) {
+        PRINTF("counter:%d", counter++);
+        vTaskDelay(1000 / portTICK_RATE_MS);
+    }
 
     free(wifi_settings);
 }

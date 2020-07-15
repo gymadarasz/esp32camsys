@@ -25,7 +25,8 @@ export class DeviceSetupComponent implements OnInit {
   
   constructor(private require: RequireService) {
     let deviceSetupData = JSON.parse(localStorage.getItem('deviceSetup')) ?? {
-      wifiCredentials: []
+      wifiCredentials: [],
+      secret: this.getSecret(),
     };
     this.wifiCredentials = new WifiCredentialList(
       deviceSetupData.wifiCredentials ?? []
@@ -88,7 +89,8 @@ export class DeviceSetupComponent implements OnInit {
     this.uploadSettingsDisabled = true;
 
     localStorage.setItem('deviceSetup', JSON.stringify({
-      wifiCredentials: this.wifiCredentials.getCredentials()
+      wifiCredentials: this.wifiCredentials.getCredentials(),
+      secret: this.getSecret(),
     }));
     
 
@@ -102,6 +104,8 @@ export class DeviceSetupComponent implements OnInit {
       this.getWifiCredentialsMessage() + '\n' +
       'HOST ADDRESS OR IP:\n' +
       this.getHostAddressOrIPWithProtocol() + '\n' +
+      'SECRET\n' +
+      this.getSecret() + '\n' +
       'COMMIT\n';
 
     // TODO: secret key send to client devices to identify each cameras in system
@@ -144,6 +148,26 @@ export class DeviceSetupComponent implements OnInit {
       }
     }
     return addresses.join(';');
+  }
+
+  private getSecret(): string {
+    let storedDeviceSetup = JSON.parse(localStorage.getItem('deviceSetup'));
+    if (storedDeviceSetup && storedDeviceSetup.secret) {
+      return storedDeviceSetup.secret;
+    }
+    storedDeviceSetup.secret = this.getRandomToken(32);
+    localStorage.setItem('deviceSetup', JSON.stringify(storedDeviceSetup));
+    return storedDeviceSetup.secret;
+  }
+
+  private getRandomToken(length: number): string {
+    let result           = '';
+    let characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let charactersLength = characters.length;
+    for ( let i = 0; i < length; i++ ) {
+       result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
+    return result;
   }
 
 }
