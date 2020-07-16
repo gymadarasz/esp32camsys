@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { RequireService } from '../require.service';
+import { HttpServerAppFactoryService } from '../http-server-app-factory.service';
 
 class CamDevice {
 
@@ -19,7 +19,7 @@ class CamDeviceList {
     this.camDevices.push(camDevice);
   }
 
-  joinDevice(id: string): CamDevice | null {
+  joinDevice(id: string, type: string): CamDevice | null {
     let foundDevice: CamDevice = null;
     this.camDevices.forEach((camDevice) => {
       if (!foundDevice && camDevice.id === id) {
@@ -31,6 +31,7 @@ class CamDeviceList {
     if (!foundDevice) {
       foundDevice = new CamDevice();
       foundDevice.id = id;
+      foundDevice.type = type;
       foundDevice.connectedAt = Math.round((new Date()).getTime());
       this.addCamDevice(foundDevice);
     }
@@ -46,48 +47,20 @@ class CamDeviceList {
 })
 export class DeviceListComponent implements OnInit {
 
-  static readonly port = 3000;
 
   camDeviceList: CamDeviceList = new CamDeviceList();
-  express = this.require.import('express');
-  bodyParser = this.require.import('body-parser');
-  static httpServerApp: any = null;
 
-  static getHttpServerApp(caller: DeviceListComponent) {
-    if (!this.httpServerApp) {
-      this.httpServerApp = caller.express();
-      this.httpServerApp.use(caller.bodyParser.urlencoded({
-        extended: true,
-      }));
-
-      this.httpServerApp.post('/join', (req: any, res: any) => {
-        console.log("POST", req, res);
-        res.send('HELLO POSTER');
-      });
-
-      // this.httpServerApp.get('/join/:id', (req: any, res: any) => {
-      //   caller.camDeviceList.joinDevice(req.params.id);
-      //   console.log(caller.camDeviceList);
-      //   caller.refreshDeviceList();
-
-      //   res.send('ATTACHED');
-      // });
-      this.httpServerApp.listen(DeviceListComponent.port);
-    }
-    return this.httpServerApp;
-  }
-
-  constructor(private require: RequireService) {
+  constructor(private httpServerAppFactory: HttpServerAppFactoryService) {
     this.loadDeviceList();
 
-    DeviceListComponent.getHttpServerApp(this);
+    this.httpServerAppFactory.getHttpServerApp(this);
 
     setInterval(() => {
       let now = Math.round((new Date()).getTime());
       this.camDeviceList.camDevices.forEach((camDevice) => {
         camDevice.status = 'connected';
         console.log(now, camDevice.connectedAt, now - camDevice.connectedAt);
-        if (now - camDevice.connectedAt > 3) {
+        if (now - camDevice.connectedAt > 10000) {
           camDevice.status = '...';
         }
       });

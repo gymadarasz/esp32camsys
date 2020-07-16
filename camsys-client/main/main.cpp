@@ -11,6 +11,26 @@
 #include "nvs.h"
 #include "sdkconfig.h"
 
+// #include "esp_camera.h"
+// #include "xclk.h"
+// #include "sccb.h"
+// #include "ov2640.h"
+// #include "sensor.h"
+// #include "yuv.h"
+// #include "twi.h"
+// #include "esp_jpg_decode.h"
+
+// static const char *TAG = "espcam";
+// #include "xclk.c"
+// #include "ov2640.c"
+// #include "sccb.c"
+// #include "sensor.c"
+// #include "yuv.c"
+// #include "twi.c"
+// #include "to_bmp.c"
+// #include "esp_jpg_decode.c"
+// #include "camera.c"
+
 
 /****************** COMMON *****************/
 
@@ -488,8 +508,7 @@ char* app_wifi_start(nvs_handle_t nvs_handle) {
     if (!wifi_scan_connect(wifi_settings)) ERROR("WIFI connect error");
     return wifi_settings;
 }
-
-/****************** MOTION MODE *****************/
+/****************** HTTP CLIENT *****************/
 
 typedef void (*http_response_handler_t)(char* buff, size_t size);
 
@@ -501,24 +520,24 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
     static int output_len;       // Stores number of bytes read
     switch(evt->event_id) {
         case HTTP_EVENT_ERROR:
-            ESP_LOGD("camsys", "HTTP_EVENT_ERROR");
-            PRINT("HTTP ERROR");
+            // ESP_LOGD("camsys", "HTTP_EVENT_ERROR");
+            // PRINT("HTTP ERROR");
             break;
         case HTTP_EVENT_ON_CONNECTED:
-            ESP_LOGD("camsys", "HTTP_EVENT_ON_CONNECTED");
-            PRINT("HTTP ON CONNECTED");
+            // ESP_LOGD("camsys", "HTTP_EVENT_ON_CONNECTED");
+            // PRINT("HTTP ON CONNECTED");
             break;
         case HTTP_EVENT_HEADER_SENT:
-            ESP_LOGD("camsys", "HTTP_EVENT_HEADER_SENT");
-            PRINT("HTTP HEADER SENT");
+            // ESP_LOGD("camsys", "HTTP_EVENT_HEADER_SENT");
+            // PRINT("HTTP HEADER SENT");
             break;
         case HTTP_EVENT_ON_HEADER:
-            ESP_LOGD("camsys", "HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
-            PRINT("HTTP ON HEADER");
+            // ESP_LOGD("camsys", "HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
+            // PRINT("HTTP ON HEADER");
             break;
         case HTTP_EVENT_ON_DATA:
-            ESP_LOGD("camsys", "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
-            PRINT("HTTP ON DATA");
+            // ESP_LOGD("camsys", "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+            // PRINT("HTTP ON DATA");
             /*
              *  Check for chunked encoding is added as the URL for chunked encoding used in this example returns binary data.
              *  However, event handler can also be used in case chunked encoding is used.
@@ -543,8 +562,8 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 
             break;
         case HTTP_EVENT_ON_FINISH:
-            ESP_LOGD("camsys", "HTTP_EVENT_ON_FINISH");
-            PRINT("HTTP ON FINISH");
+            // ESP_LOGD("camsys", "HTTP_EVENT_ON_FINISH");
+            // PRINT("HTTP ON FINISH");
             if (output_buffer != NULL) {
                 // Response is accumulated in output_buffer. Uncomment the below line to print the accumulated response
                 // ESP_LOG_BUFFER_HEX("camsys", output_buffer, output_len);
@@ -555,8 +574,8 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
             output_len = 0;
             break;
         case HTTP_EVENT_DISCONNECTED:
-            ESP_LOGI("camsys", "HTTP_EVENT_DISCONNECTED");
-            PRINT("HTTP DISCONNECTED");
+            // ESP_LOGI("camsys", "HTTP_EVENT_DISCONNECTED");
+            // PRINT("HTTP DISCONNECTED");
             int mbedtls_err = 0;
             esp_err_t err = esp_tls_get_and_clear_last_error((esp_tls_error_handle_t)evt->data, &mbedtls_err, NULL);
             if (err != 0) {
@@ -616,14 +635,14 @@ bool http_request(
     esp_http_client_set_post_field(client, post_data, strlen(post_data));
     
 
-    PRINT("HTTP PERFOM...");
+    // PRINT("HTTP PERFOM...");
     _http_response_handler = response_handler;
     esp_err_t err = esp_http_client_perform(client);
-    PRINT("HTTP PERFORMED.");
+    // PRINT("HTTP PERFORMED.");
     if (err == ESP_OK) {
-        ESP_LOGI("camsys", "HTTP POST Status = %d, content_length = %d",
-                esp_http_client_get_status_code(client),
-                esp_http_client_get_content_length(client));
+        // ESP_LOGI("camsys", "HTTP POST Status = %d, content_length = %d",
+        //         esp_http_client_get_status_code(client),
+        //         esp_http_client_get_content_length(client));
     } else {
         ESP_LOGE("camsys", "HTTP POST request failed: %s", esp_err_to_name(err));
     }
@@ -636,7 +655,10 @@ void app_http_response_handler(char* buff, size_t size) {
     PRINTF("RESPONSE STRING LENGTH: %d, BUFF_SIZE: %d", strlen(buff), size);
 }
 
-bool app_http_request_join(nvs_handle_t nvs_handle) {
+
+/****************** APP TASKS STARTER *****************/
+
+bool app_http_request_join(nvs_handle_t nvs_handle, const char* additional_join_post_data, http_response_handler_t http_response_handler) {
     const size_t strmax = 255;
     char url[strmax];
     char post_data[strmax];
@@ -648,9 +670,9 @@ bool app_http_request_join(nvs_handle_t nvs_handle) {
     char* secret = nvs_gets(nvs_handle, "secret");
 
     snprintf(url, strmax, "%s://%s:%d/join", http_prefix, host, http_port);
-    snprintf(post_data, strmax, "client=%s&secret=%s", uids, secret);
+    snprintf(post_data, strmax, "client=%s&secret=%s&%s", uids, secret, additional_join_post_data);
 
-    bool ret = http_request(HTTP_METHOD_POST, url, post_data, app_http_response_handler);
+    bool ret = http_request(HTTP_METHOD_POST, url, post_data, http_response_handler);
 
     free(secret);
     free(http_prefix);
@@ -660,19 +682,175 @@ bool app_http_request_join(nvs_handle_t nvs_handle) {
     return ret;
 }
 
-void app_main_motion(nvs_handle_t nvs_handle) {
+typedef void (*additional_join_post_data_cb_t)(char* buff, size_t size); 
+
+void app_main_start(nvs_handle_t nvs_handle, additional_join_post_data_cb_t additional_join_post_data_cb, TaskFunction_t subtask) {
     char* wifi_settings = app_wifi_start(nvs_handle);
     
-    app_http_request_join(nvs_handle);
+    TaskHandle_t xSubTaskHandle = NULL;
+    const size_t subtask_stack_size = 10000;
+    xTaskCreate(subtask, "subtask", subtask_stack_size, NULL, tskIDLE_PRIORITY, &xSubTaskHandle);
+
+    const size_t additional_join_post_data_size = 1000;
+    char* additional_join_post_data = (char*)calloc(additional_join_post_data_size, sizeof(char));
+    if (!additional_join_post_data) ERROR("Memory allocation error.");
+
+    while(1) {
+        additional_join_post_data_cb(additional_join_post_data, additional_join_post_data_size);
+        app_http_request_join(nvs_handle, additional_join_post_data, app_http_response_handler);
+        vTaskDelay(3000 / portTICK_RATE_MS);
+    }
+
+    free(additional_join_post_data);
+
+    if( xSubTaskHandle != NULL ) vTaskDelete( xSubTaskHandle );
+    
+    free(wifi_settings);
+}
+
+
+/****************** MOTION MODE *****************/
+
+
+// //CAMERA_MODEL_AI_THINKER PIN Map
+// #define CAM_PIN_PWDN    32 //power down is not used
+// #define CAM_PIN_RESET   -1 //software reset will be performed
+// #define CAM_PIN_XCLK    0
+// #define CAM_PIN_SIOD    26
+// #define CAM_PIN_SIOC    27
+
+// #define CAM_PIN_D7      35
+// #define CAM_PIN_D6      34
+// #define CAM_PIN_D5      39
+// #define CAM_PIN_D4      36
+// #define CAM_PIN_D3      21
+// #define CAM_PIN_D2      19
+// #define CAM_PIN_D1      18
+// #define CAM_PIN_D0       5
+// #define CAM_PIN_VSYNC   25
+// #define CAM_PIN_HREF    23
+// #define CAM_PIN_PCLK    22
+
+// static camera_config_t motion_camera_config = {
+//     .pin_pwdn  = CAM_PIN_PWDN,
+//     .pin_reset = CAM_PIN_RESET,
+//     .pin_xclk = CAM_PIN_XCLK,
+//     .pin_sscb_sda = CAM_PIN_SIOD,
+//     .pin_sscb_scl = CAM_PIN_SIOC,
+
+//     .pin_d7 = CAM_PIN_D7,
+//     .pin_d6 = CAM_PIN_D6,
+//     .pin_d5 = CAM_PIN_D5,
+//     .pin_d4 = CAM_PIN_D4,
+//     .pin_d3 = CAM_PIN_D3,
+//     .pin_d2 = CAM_PIN_D2,
+//     .pin_d1 = CAM_PIN_D1,
+//     .pin_d0 = CAM_PIN_D0,
+//     .pin_vsync = CAM_PIN_VSYNC,
+//     .pin_href = CAM_PIN_HREF,
+//     .pin_pclk = CAM_PIN_PCLK,
+
+//     //XCLK 20MHz or 10MHz for OV2640 double FPS (Experimental)
+//     .xclk_freq_hz = 20000000,
+//     .ledc_timer = LEDC_TIMER_0,
+//     .ledc_channel = LEDC_CHANNEL_0,
+
+//     //.pixel_format = PIXFORMAT_RGB888, //PIXFORMAT_JPEG, //YUV422,GRAYSCALE,RGB565,JPEG
+//     //.frame_size = FRAMESIZE_QVGA, //FRAMESIZE_UXGA,//QQVGA-QXGA Do not use sizes above QVGA when not JPEG
+
+//     .pixel_format = PIXFORMAT_GRAYSCALE, //PIXFORMAT_RGB888, //PIXFORMAT_JPEG, //YUV422,GRAYSCALE,RGB565,JPEG
+//     .frame_size = FRAMESIZE_96X96, //FRAMESIZE_QVGA, //FRAMESIZE_UXGA,//QQVGA-QXGA Do not use sizes above QVGA when not JPEG
+
+//     .jpeg_quality = 0, //0-63 lower number means higher quality
+//     .fb_count = 1 //if more than one, i2s runs in continuous mode. Use only with JPEG
+// };
+
+
+// camera_fb_t * fb = NULL;
+
+
+// struct watch_s {
+//     int x;
+//     int y;
+//     int size;
+//     int raster;
+//     int threshold;
+// };
+
+// typedef struct watch_s watch_t;
+
+
+// void app_main_motion_init() {
+//     //initialize the camera
+//     ESP_ERROR_CHECK( esp_camera_init(&motion_camera_config) );
+// }
+
+// void app_main_motion_show_diff(size_t diff_sum) {
+//     char spc[] = "]]]]]]]]]]]]]]]]]]]]]]]]]]]]][";
+//     char* s = spc; 
+//     for (int i=0; i<29; i++) {
+//         if (i*10>diff_sum) s[i] = ' ';
+//     }
+//     PRINTF("%s (%u)", s, diff_sum);
+// }
+
+//----
+
+void app_main_motion_additional_join_post_data(char* buff, size_t size) {
+    strncpy(buff, "type=motion", size);
+}
+
+void app_main_motion_loop(void * pvParameters) {
+
+    // watch_t watcher = {43, 43, 10, 5, 100};
+    // static const int watcher_size_max = 40;
+    // uint8_t prev_buf[40*40*4];
+
+    // static const size_t buff_size = watcher_size_max*watcher_size_max*4;
+
+    // size_t diff_sum_max = 0;
+
+    // app_main_motion_init();
 
     int counter = 0;
     while(1) {
         PRINTF("counter:%d", counter++);
         vTaskDelay(1000 / portTICK_RATE_MS);
+
+
+        // fb = esp_camera_fb_get();            
+        // if (!fb) PRINT("Motion Camera capture failed");
+        
+        // int xfrom = watcher.x - watcher.size;
+        // int xto = watcher.x + watcher.size;
+        // int yfrom = watcher.y - watcher.size;
+        // int yto = watcher.y + watcher.size;
+        // int i=0;
+        // size_t diff_sum = 0;
+        // for (int x=xfrom; x<xto; x+=watcher.raster) {
+        //     for (int y=yfrom; y<yto; y+=watcher.raster) {
+        //         int diff = fb->buf[x+y*fb->width] - prev_buf[i];
+        //         diff_sum += (diff > 0 ? diff : -diff);
+        //         prev_buf[i] = fb->buf[x+y*fb->width];
+        //         i++;
+        //         if (i>=buff_size) {
+        //             PRINT("buff size too large");
+        //             break;
+        //         }
+        //     }
+        // }
+
+        // if (diff_sum_max < diff_sum) diff_sum_max = diff_sum;
+        
+        // app_main_motion_show_diff(diff_sum);
+        // if (diff_sum >= watcher.threshold) {
+        //     PRINT("******************************************************");
+        //     PRINT("*********************** [ALERT] **********************");
+        //     PRINT("******************************************************");
+        // }
+        
+        // esp_camera_fb_return(fb);
     }
-
-
-    free(wifi_settings);
 }
 
 /****************** MAIN *****************/
@@ -690,7 +868,7 @@ extern "C" void app_main()
     int camera_button_state = !gpio_get_level(GPIO_NUM_13);
 
     if (motion_button_state) 
-        app_main_motion(nvs_handle); //wifi_websocket_client_app_start(motion_sensor_setup, motion_sensor_loop, motion_sensor_data, motion_sensor_connected, motion_sensor_disconnected, motion_sensor_error);
+        app_main_start(nvs_handle, app_main_motion_additional_join_post_data, app_main_motion_loop); //wifi_websocket_client_app_start(motion_sensor_setup, motion_sensor_loop, motion_sensor_data, motion_sensor_connected, motion_sensor_disconnected, motion_sensor_error);
     else if (camera_button_state) 
         printf("CAMERA MODE...\n"); //wifi_websocket_client_app_start(camera_recorder_setup, camera_recorder_loop, camera_recorder_data, camera_recorder_connected, camera_recorder_disconnected, camera_recorder_error);
     else 

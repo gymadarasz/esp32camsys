@@ -1,0 +1,20 @@
+{
+    "project_name":       "bootloader",
+    "project_path":       "/home/gyula/esp/esp-idf/components/bootloader/subproject",
+    "build_dir":          "/home/gyula/Desktop/esp32camsys/old/simple/build/bootloader",
+    "config_file":        "/home/gyula/Desktop/esp32camsys/old/simple/sdkconfig",
+    "config_defaults":    "",
+    "app_elf":            "bootloader.elf",
+    "app_bin":            "bootloader.bin",
+    "git_revision":       "v4.2-dev-2243-gcf056a7d0-dirty",
+    "target":             "esp32",
+    "phy_data_partition": "",
+    "monitor_baud" :      "115200",
+    "monitor_toolprefix": "xtensa-esp32-elf-",
+    "config_environment" : {
+        "COMPONENT_KCONFIGS" : "/home/gyula/esp/esp-idf/components/efuse/Kconfig;/home/gyula/esp/esp-idf/components/esp32/Kconfig;/home/gyula/esp/esp-idf/components/esp_common/Kconfig;/home/gyula/esp/esp-idf/components/log/Kconfig;/home/gyula/esp/esp-idf/components/spi_flash/Kconfig",
+        "COMPONENT_KCONFIGS_PROJBUILD" : "/home/gyula/esp/esp-idf/components/bootloader/Kconfig.projbuild;/home/gyula/esp/esp-idf/components/esptool_py/Kconfig.projbuild;/home/gyula/esp/esp-idf/components/partition_table/Kconfig.projbuild"
+    },
+    "build_components" : [ "bootloader", "bootloader_support", "efuse", "esp32", "esp_common", "esp_rom", "esptool_py", "log", "main", "micro-ecc", "partition_table", "soc", "spi_flash", "xtensa", "" ],
+    "build_component_paths" : [ "/home/gyula/esp/esp-idf/components/bootloader", "/home/gyula/esp/esp-idf/components/bootloader_support", "/home/gyula/esp/esp-idf/components/efuse", "/home/gyula/esp/esp-idf/components/esp32", "/home/gyula/esp/esp-idf/components/esp_common", "/home/gyula/esp/esp-idf/components/esp_rom", "/home/gyula/esp/esp-idf/components/esptool_py", "/home/gyula/esp/esp-idf/components/log", "/home/gyula/esp/esp-idf/components/bootloader/subproject/main", "/home/gyula/esp/esp-idf/components/bootloader/subproject/components/micro-ecc", "/home/gyula/esp/esp-idf/components/partition_table", "/home/gyula/esp/esp-idf/components/soc", "/home/gyula/esp/esp-idf/components/spi_flash", "/home/gyula/esp/esp-idf/components/xtensa", "" ]
+}

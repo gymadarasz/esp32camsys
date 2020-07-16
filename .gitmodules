@@ -1,0 +1,6 @@
+[submodule "camsys-client/main/esp32-camera"]
+	path = camsys-client/main/esp32-camera
+	url = https://github.com/espressif/esp32-camera.git
+[submodule "camsys-client/lib/esp32-camera"]
+	path = camsys-client/lib/esp32-camera
+	url = https://github.com/espressif/esp32-camera.git

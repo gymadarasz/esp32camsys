@@ -4,7 +4,7 @@ import { ComPort } from '../com-port';
 import { WifiCredentialList } from '../wifi-credential-list';
 import { WifiCredential } from '../wifi-credential';
 import { DeviceSetupWriter } from '../device-setup-writer';
-import { DeviceListComponent } from '../device-list/device-list.component';
+import { HttpServerAppFactoryService } from '../http-server-app-factory.service';
 
 @Component({
   selector: 'cam-device-setup',
@@ -24,10 +24,10 @@ export class DeviceSetupComponent implements OnInit {
   serialDeviceWriter = new DeviceSetupWriter();
   readline = this.require.import('@serialport/parser-readline');
   
-  constructor(private require: RequireService) {
+  constructor(private require: RequireService, private httpServerAppFactory: HttpServerAppFactoryService) {
     let deviceSetupData = JSON.parse(localStorage.getItem('deviceSetup')) ?? {
       wifiCredentials: [],
-      secret: this.getSecret(),
+      secret: this.httpServerAppFactory.getSecret(),
     };
     this.wifiCredentials = new WifiCredentialList(
       deviceSetupData.wifiCredentials ?? []
@@ -91,7 +91,7 @@ export class DeviceSetupComponent implements OnInit {
 
     localStorage.setItem('deviceSetup', JSON.stringify({
       wifiCredentials: this.wifiCredentials.getCredentials(),
-      secret: this.getSecret(),
+      secret: this.httpServerAppFactory.getSecret(),
     }));
     
 
@@ -101,12 +101,12 @@ export class DeviceSetupComponent implements OnInit {
     }
 
     let message = 
-      'UID STRING:\n' + this.getRandomToken(32)  + '\n' +
+      'UID STRING:\n' + this.httpServerAppFactory.getRandomToken(32)  + '\n' +
       'WIFI CREDENTIALS:\n' + this.getWifiCredentialsMessage() + '\n' +
       'HOST ADDRESS OR IP:\n' + this.getHostAddressOrIP() + '\n' +
-      'SECRET:\n' + this.getSecret() + '\n' +
+      'SECRET:\n' + this.httpServerAppFactory.getSecret() + '\n' +
       'HTTP PREFIX:\n' + 'http'  + '\n' +
-      'HTTP PORT:\n' + DeviceListComponent.port  + '\n' +
+      'HTTP PORT:\n' + this.httpServerAppFactory.port  + '\n' +
       'COMMIT\n';
 
     // TODO: secret key send to client devices to identify each cameras in system
@@ -149,26 +149,6 @@ export class DeviceSetupComponent implements OnInit {
       }
     }
     return addresses.join(';');
-  }
-
-  private getSecret(): string {
-    let storedDeviceSetup = JSON.parse(localStorage.getItem('deviceSetup'));
-    if (storedDeviceSetup && storedDeviceSetup.secret) {
-      return storedDeviceSetup.secret;
-    }
-    storedDeviceSetup.secret = this.getRandomToken(32);
-    localStorage.setItem('deviceSetup', JSON.stringify(storedDeviceSetup));
-    return storedDeviceSetup.secret;
-  }
-
-  private getRandomToken(length: number): string {
-    let result           = '';
-    let characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let charactersLength = characters.length;
-    for ( let i = 0; i < length; i++ ) {
-       result += characters.charAt(Math.floor(Math.random() * charactersLength));
-    }
-    return result;
   }
 
 }
