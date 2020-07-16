@@ -11,7 +11,7 @@
 #include "nvs.h"
 #include "sdkconfig.h"
 
-// #include "esp_camera.h"
+#include "esp_camera.h"
 // #include "xclk.h"
 // #include "sccb.h"
 // #include "ov2640.h"
@@ -29,7 +29,7 @@
 // #include "twi.c"
 // #include "to_bmp.c"
 // #include "esp_jpg_decode.c"
-// #include "camera.c"
+#include "camera.c"
 
 
 /****************** COMMON *****************/
@@ -712,87 +712,87 @@ void app_main_start(nvs_handle_t nvs_handle, additional_join_post_data_cb_t addi
 /****************** MOTION MODE *****************/
 
 
-// //CAMERA_MODEL_AI_THINKER PIN Map
-// #define CAM_PIN_PWDN    32 //power down is not used
-// #define CAM_PIN_RESET   -1 //software reset will be performed
-// #define CAM_PIN_XCLK    0
-// #define CAM_PIN_SIOD    26
-// #define CAM_PIN_SIOC    27
+//CAMERA_MODEL_AI_THINKER PIN Map
+#define CAM_PIN_PWDN    32 //power down is not used
+#define CAM_PIN_RESET   -1 //software reset will be performed
+#define CAM_PIN_XCLK    0
+#define CAM_PIN_SIOD    26
+#define CAM_PIN_SIOC    27
 
-// #define CAM_PIN_D7      35
-// #define CAM_PIN_D6      34
-// #define CAM_PIN_D5      39
-// #define CAM_PIN_D4      36
-// #define CAM_PIN_D3      21
-// #define CAM_PIN_D2      19
-// #define CAM_PIN_D1      18
-// #define CAM_PIN_D0       5
-// #define CAM_PIN_VSYNC   25
-// #define CAM_PIN_HREF    23
-// #define CAM_PIN_PCLK    22
+#define CAM_PIN_D7      35
+#define CAM_PIN_D6      34
+#define CAM_PIN_D5      39
+#define CAM_PIN_D4      36
+#define CAM_PIN_D3      21
+#define CAM_PIN_D2      19
+#define CAM_PIN_D1      18
+#define CAM_PIN_D0       5
+#define CAM_PIN_VSYNC   25
+#define CAM_PIN_HREF    23
+#define CAM_PIN_PCLK    22
 
-// static camera_config_t motion_camera_config = {
-//     .pin_pwdn  = CAM_PIN_PWDN,
-//     .pin_reset = CAM_PIN_RESET,
-//     .pin_xclk = CAM_PIN_XCLK,
-//     .pin_sscb_sda = CAM_PIN_SIOD,
-//     .pin_sscb_scl = CAM_PIN_SIOC,
+static camera_config_t motion_camera_config = {
+    .pin_pwdn  = CAM_PIN_PWDN,
+    .pin_reset = CAM_PIN_RESET,
+    .pin_xclk = CAM_PIN_XCLK,
+    .pin_sscb_sda = CAM_PIN_SIOD,
+    .pin_sscb_scl = CAM_PIN_SIOC,
 
-//     .pin_d7 = CAM_PIN_D7,
-//     .pin_d6 = CAM_PIN_D6,
-//     .pin_d5 = CAM_PIN_D5,
-//     .pin_d4 = CAM_PIN_D4,
-//     .pin_d3 = CAM_PIN_D3,
-//     .pin_d2 = CAM_PIN_D2,
-//     .pin_d1 = CAM_PIN_D1,
-//     .pin_d0 = CAM_PIN_D0,
-//     .pin_vsync = CAM_PIN_VSYNC,
-//     .pin_href = CAM_PIN_HREF,
-//     .pin_pclk = CAM_PIN_PCLK,
+    .pin_d7 = CAM_PIN_D7,
+    .pin_d6 = CAM_PIN_D6,
+    .pin_d5 = CAM_PIN_D5,
+    .pin_d4 = CAM_PIN_D4,
+    .pin_d3 = CAM_PIN_D3,
+    .pin_d2 = CAM_PIN_D2,
+    .pin_d1 = CAM_PIN_D1,
+    .pin_d0 = CAM_PIN_D0,
+    .pin_vsync = CAM_PIN_VSYNC,
+    .pin_href = CAM_PIN_HREF,
+    .pin_pclk = CAM_PIN_PCLK,
 
-//     //XCLK 20MHz or 10MHz for OV2640 double FPS (Experimental)
-//     .xclk_freq_hz = 20000000,
-//     .ledc_timer = LEDC_TIMER_0,
-//     .ledc_channel = LEDC_CHANNEL_0,
+    //XCLK 20MHz or 10MHz for OV2640 double FPS (Experimental)
+    .xclk_freq_hz = 20000000,
+    .ledc_timer = LEDC_TIMER_0,
+    .ledc_channel = LEDC_CHANNEL_0,
 
-//     //.pixel_format = PIXFORMAT_RGB888, //PIXFORMAT_JPEG, //YUV422,GRAYSCALE,RGB565,JPEG
-//     //.frame_size = FRAMESIZE_QVGA, //FRAMESIZE_UXGA,//QQVGA-QXGA Do not use sizes above QVGA when not JPEG
+    //.pixel_format = PIXFORMAT_RGB888, //PIXFORMAT_JPEG, //YUV422,GRAYSCALE,RGB565,JPEG
+    //.frame_size = FRAMESIZE_QVGA, //FRAMESIZE_UXGA,//QQVGA-QXGA Do not use sizes above QVGA when not JPEG
 
-//     .pixel_format = PIXFORMAT_GRAYSCALE, //PIXFORMAT_RGB888, //PIXFORMAT_JPEG, //YUV422,GRAYSCALE,RGB565,JPEG
-//     .frame_size = FRAMESIZE_96X96, //FRAMESIZE_QVGA, //FRAMESIZE_UXGA,//QQVGA-QXGA Do not use sizes above QVGA when not JPEG
+    .pixel_format = PIXFORMAT_GRAYSCALE, //PIXFORMAT_RGB888, //PIXFORMAT_JPEG, //YUV422,GRAYSCALE,RGB565,JPEG
+    .frame_size = FRAMESIZE_96X96, //FRAMESIZE_QVGA, //FRAMESIZE_UXGA,//QQVGA-QXGA Do not use sizes above QVGA when not JPEG
 
-//     .jpeg_quality = 0, //0-63 lower number means higher quality
-//     .fb_count = 1 //if more than one, i2s runs in continuous mode. Use only with JPEG
-// };
-
-
-// camera_fb_t * fb = NULL;
+    .jpeg_quality = 0, //0-63 lower number means higher quality
+    .fb_count = 1 //if more than one, i2s runs in continuous mode. Use only with JPEG
+};
 
 
-// struct watch_s {
-//     int x;
-//     int y;
-//     int size;
-//     int raster;
-//     int threshold;
-// };
-
-// typedef struct watch_s watch_t;
+camera_fb_t * fb = NULL;
 
 
-// void app_main_motion_init() {
-//     //initialize the camera
-//     ESP_ERROR_CHECK( esp_camera_init(&motion_camera_config) );
-// }
+struct watch_s {
+    int x;
+    int y;
+    int size;
+    int raster;
+    int threshold;
+};
 
-// void app_main_motion_show_diff(size_t diff_sum) {
-//     char spc[] = "]]]]]]]]]]]]]]]]]]]]]]]]]]]]][";
-//     char* s = spc; 
-//     for (int i=0; i<29; i++) {
-//         if (i*10>diff_sum) s[i] = ' ';
-//     }
-//     PRINTF("%s (%u)", s, diff_sum);
-// }
+typedef struct watch_s watch_t;
+
+
+void app_main_motion_init() {
+    //initialize the camera
+    ESP_ERROR_CHECK( esp_camera_init(&motion_camera_config) );
+}
+
+void app_main_motion_show_diff(size_t diff_sum) {
+    char spc[] = "]]]]]]]]]]]]]]]]]]]]]]]]]]]]][";
+    char* s = spc; 
+    for (int i=0; i<29; i++) {
+        if (i*10>diff_sum) s[i] = ' ';
+    }
+    PRINTF("%s (%u)", s, diff_sum);
+}
 
 //----
 
@@ -802,15 +802,15 @@ void app_main_motion_additional_join_post_data(char* buff, size_t size) {
 
 void app_main_motion_loop(void * pvParameters) {
 
-    // watch_t watcher = {43, 43, 10, 5, 100};
-    // static const int watcher_size_max = 40;
-    // uint8_t prev_buf[40*40*4];
+    watch_t watcher = {43, 43, 10, 5, 100};
+    static const int watcher_size_max = 40;
+    uint8_t prev_buf[40*40*4];
 
-    // static const size_t buff_size = watcher_size_max*watcher_size_max*4;
+    static const size_t buff_size = watcher_size_max*watcher_size_max*4;
 
-    // size_t diff_sum_max = 0;
+    size_t diff_sum_max = 0;
 
-    // app_main_motion_init();
+    app_main_motion_init();
 
     int counter = 0;
     while(1) {
@@ -818,38 +818,38 @@ void app_main_motion_loop(void * pvParameters) {
         vTaskDelay(1000 / portTICK_RATE_MS);
 
 
-        // fb = esp_camera_fb_get();            
-        // if (!fb) PRINT("Motion Camera capture failed");
+        fb = esp_camera_fb_get();            
+        if (!fb) PRINT("Motion Camera capture failed");
         
-        // int xfrom = watcher.x - watcher.size;
-        // int xto = watcher.x + watcher.size;
-        // int yfrom = watcher.y - watcher.size;
-        // int yto = watcher.y + watcher.size;
-        // int i=0;
-        // size_t diff_sum = 0;
-        // for (int x=xfrom; x<xto; x+=watcher.raster) {
-        //     for (int y=yfrom; y<yto; y+=watcher.raster) {
-        //         int diff = fb->buf[x+y*fb->width] - prev_buf[i];
-        //         diff_sum += (diff > 0 ? diff : -diff);
-        //         prev_buf[i] = fb->buf[x+y*fb->width];
-        //         i++;
-        //         if (i>=buff_size) {
-        //             PRINT("buff size too large");
-        //             break;
-        //         }
-        //     }
-        // }
+        int xfrom = watcher.x - watcher.size;
+        int xto = watcher.x + watcher.size;
+        int yfrom = watcher.y - watcher.size;
+        int yto = watcher.y + watcher.size;
+        int i=0;
+        size_t diff_sum = 0;
+        for (int x=xfrom; x<xto; x+=watcher.raster) {
+            for (int y=yfrom; y<yto; y+=watcher.raster) {
+                int diff = fb->buf[x+y*fb->width] - prev_buf[i];
+                diff_sum += (diff > 0 ? diff : -diff);
+                prev_buf[i] = fb->buf[x+y*fb->width];
+                i++;
+                if (i>=buff_size) {
+                    PRINT("buff size too large");
+                    break;
+                }
+            }
+        }
 
-        // if (diff_sum_max < diff_sum) diff_sum_max = diff_sum;
+        if (diff_sum_max < diff_sum) diff_sum_max = diff_sum;
         
-        // app_main_motion_show_diff(diff_sum);
-        // if (diff_sum >= watcher.threshold) {
-        //     PRINT("******************************************************");
-        //     PRINT("*********************** [ALERT] **********************");
-        //     PRINT("******************************************************");
-        // }
+        app_main_motion_show_diff(diff_sum);
+        if (diff_sum >= watcher.threshold) {
+            PRINT("******************************************************");
+            PRINT("*********************** [ALERT] **********************");
+            PRINT("******************************************************");
+        }
         
-        // esp_camera_fb_return(fb);
+        esp_camera_fb_return(fb);
     }
 }
 

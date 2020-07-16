@@ -117,6 +117,15 @@ set(CMAKE_C_TARGET_INCLUDE_PATH
   "/home/gyula/esp/esp-idf/components/unity/unity/src"
   "/home/gyula/esp/esp-idf/components/wifi_provisioning/include"
   "../main"
+  "../main/lib/esp32-camera"
+  "../main/lib/esp32-camera/conversions"
+  "../main/lib/esp32-camera/conversions/include"
+  "../main/lib/esp32-camera/conversions/private_include"
+  "../main/lib/esp32-camera/driver"
+  "../main/lib/esp32-camera/driver/include"
+  "../main/lib/esp32-camera/driver/private_include"
+  "../main/lib/esp32-camera/sensors"
+  "../main/lib/esp32-camera/sensors/private_include"
   )
 
 # Targets to which this target links.

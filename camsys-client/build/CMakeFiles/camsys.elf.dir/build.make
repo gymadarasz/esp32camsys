@@ -390,13 +390,11 @@ camsys.elf: esp-idf/newlib/libnewlib.a
 camsys.elf: esp-idf/pthread/libpthread.a
 camsys.elf: esp-idf/app_trace/libapp_trace.a
 camsys.elf: esp-idf/app_trace/libapp_trace.a
-camsys.elf: /home/gyula/esp/esp-idf/components/esp_rom/esp32/ld/esp32.rom.newlib-time.ld
 camsys.elf: /home/gyula/esp/esp-idf/components/esp_rom/esp32/ld/esp32.rom.api.ld
 camsys.elf: /home/gyula/esp/esp-idf/components/esp_rom/esp32/ld/esp32.rom.ld
 camsys.elf: /home/gyula/esp/esp-idf/components/esp_rom/esp32/ld/esp32.rom.libgcc.ld
 camsys.elf: /home/gyula/esp/esp-idf/components/esp_rom/esp32/ld/esp32.rom.newlib-data.ld
 camsys.elf: /home/gyula/esp/esp-idf/components/esp_rom/esp32/ld/esp32.rom.syscalls.ld
-camsys.elf: /home/gyula/esp/esp-idf/components/esp_rom/esp32/ld/esp32.rom.newlib-funcs.ld
 camsys.elf: esp-idf/esp32/esp32_out.ld
 camsys.elf: esp-idf/esp32/ld/esp32.project.ld
 camsys.elf: /home/gyula/esp/esp-idf/components/esp32/ld/esp32.peripherals.ld

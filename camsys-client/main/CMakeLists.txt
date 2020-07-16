@@ -1,9 +1,13 @@
 idf_component_register(SRCS "main.cpp"
-                    INCLUDE_DIRS ".")
-                    
-                    
-# Import esp32-camera targets 
-#add_subdirectory(lib/esp32-camera)
+                    INCLUDE_DIRS "." 
+                        lib/esp32-camera
+                        lib/esp32-camera
+                        lib/esp32-camera/conversions
+                        lib/esp32-camera/conversions/include
+                        lib/esp32-camera/conversions/private_include
+                        lib/esp32-camera/driver
+                        lib/esp32-camera/driver/include
+                        lib/esp32-camera/driver/private_include
+                        lib/esp32-camera/sensors
+                        lib/esp32-camera/sensors/private_include)
 
-# Link esp32-camera to main component
-#target_link_libraries(${COMPONENT_LIB} PUBLIC esp32-camera)

@@ -168,16 +168,6 @@ stdint.h
 esp_err.h
 /home/gyula/esp/esp-idf/components/soc/include/hal/esp_err.h
 
-/home/gyula/esp/esp-idf/components/soc/include/hal/gpio_hal.h
-soc/gpio_periph.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/soc/gpio_periph.h
-hal/gpio_ll.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/hal/gpio_ll.h
-hal/gpio_types.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/hal/gpio_types.h
-soc/rtc_io_reg.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/soc/rtc_io_reg.h
-
 /home/gyula/esp/esp-idf/components/soc/include/hal/gpio_types.h
 soc/gpio_periph.h
 /home/gyula/esp/esp-idf/components/soc/include/hal/soc/gpio_periph.h
@@ -187,40 +177,6 @@ soc/gpio_caps.h
 /home/gyula/esp/esp-idf/components/soc/include/hal/hal_defs.h
 esp_log.h
 /home/gyula/esp/esp-idf/components/soc/include/hal/esp_log.h
-
-/home/gyula/esp/esp-idf/components/soc/include/hal/i2c_hal.h
-hal/i2c_ll.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/hal/i2c_ll.h
-hal/i2c_types.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/hal/i2c_types.h
-
-/home/gyula/esp/esp-idf/components/soc/include/hal/i2c_types.h
-stdint.h
--
-stdbool.h
--
-soc/i2c_caps.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/soc/i2c_caps.h
-
-/home/gyula/esp/esp-idf/components/soc/include/hal/i2s_hal.h
-soc/i2s_periph.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/soc/i2s_periph.h
-soc/i2s_caps.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/soc/i2s_caps.h
-hal/i2s_ll.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/hal/i2s_ll.h
-hal/i2s_types.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/hal/i2s_types.h
-
-/home/gyula/esp/esp-idf/components/soc/include/hal/i2s_types.h
-stdint.h
--
-stdlib.h
--
-stddef.h
--
-soc/i2s_caps.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/soc/i2s_caps.h
 
 /home/gyula/esp/esp-idf/components/soc/include/hal/ledc_hal.h
 hal/ledc_ll.h
@@ -243,44 +199,6 @@ hal/mcpwm_ll.h
 /home/gyula/esp/esp-idf/components/soc/include/hal/hal/mcpwm_ll.h
 
 /home/gyula/esp/esp-idf/components/soc/include/hal/mcpwm_types.h
-
-/home/gyula/esp/esp-idf/components/soc/include/hal/mpu_hal.h
-stdint.h
--
-esp_err.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/esp_err.h
-hal/mpu_types.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/hal/mpu_types.h
-
-/home/gyula/esp/esp-idf/components/soc/include/hal/mpu_types.h
-stdint.h
--
-
-/home/gyula/esp/esp-idf/components/soc/include/hal/pcnt_hal.h
-stdio.h
--
-soc/pcnt_periph.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/soc/pcnt_periph.h
-hal/pcnt_types.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/hal/pcnt_types.h
-hal/pcnt_ll.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/hal/pcnt_ll.h
-
-/home/gyula/esp/esp-idf/components/soc/include/hal/pcnt_types.h
-
-/home/gyula/esp/esp-idf/components/soc/include/hal/rmt_hal.h
-soc/rmt_struct.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/soc/rmt_struct.h
-soc/rmt_caps.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/soc/rmt_caps.h
-
-/home/gyula/esp/esp-idf/components/soc/include/hal/rtc_io_hal.h
-hal/rtc_io_ll.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/hal/rtc_io_ll.h
-esp_err.h
--
-
-/home/gyula/esp/esp-idf/components/soc/include/hal/rtc_io_types.h
 
 /home/gyula/esp/esp-idf/components/soc/include/hal/sdio_slave_hal.h
 esp_err.h
@@ -311,18 +229,6 @@ soc/lldesc.h
 /home/gyula/esp/esp-idf/components/soc/include/hal/sdio_slave_types.h
 soc/soc.h
 /home/gyula/esp/esp-idf/components/soc/include/hal/soc/soc.h
-
-/home/gyula/esp/esp-idf/components/soc/include/hal/sigmadelta_hal.h
-soc/sigmadelta_periph.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/soc/sigmadelta_periph.h
-hal/sigmadelta_types.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/hal/sigmadelta_types.h
-hal/sigmadelta_ll.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/hal/sigmadelta_ll.h
-
-/home/gyula/esp/esp-idf/components/soc/include/hal/sigmadelta_types.h
-soc/sigmadelta_caps.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/soc/sigmadelta_caps.h
 
 /home/gyula/esp/esp-idf/components/soc/include/hal/soc_hal.h
 stdint.h
@@ -422,20 +328,6 @@ stdint.h
 stdbool.h
 -
 
-/home/gyula/esp/esp-idf/components/soc/include/hal/uart_hal.h
-hal/uart_ll.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/hal/uart_ll.h
-hal/uart_types.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/hal/uart_types.h
-
-/home/gyula/esp/esp-idf/components/soc/include/hal/uart_types.h
-stdint.h
--
-stdbool.h
--
-soc/uart_caps.h
-/home/gyula/esp/esp-idf/components/soc/include/hal/soc/uart_caps.h
-
 /home/gyula/esp/esp-idf/components/soc/include/hal/wdt_hal.h
 stdbool.h
 -
@@ -489,16 +381,6 @@ esp32/rom/lldesc.h
 /home/gyula/esp/esp-idf/components/soc/include/soc/esp32/rom/lldesc.h
 esp32s2/rom/lldesc.h
 /home/gyula/esp/esp-idf/components/soc/include/soc/esp32s2/rom/lldesc.h
-
-/home/gyula/esp/esp-idf/components/soc/include/soc/rtc_wdt.h
-stdint.h
--
-stdbool.h
--
-soc/rtc_periph.h
-/home/gyula/esp/esp-idf/components/soc/include/soc/soc/rtc_periph.h
-esp_err.h
-/home/gyula/esp/esp-idf/components/soc/include/soc/esp_err.h
 
 /home/gyula/esp/esp-idf/components/soc/include/soc/soc_memory_layout.h
 stdlib.h
@@ -596,14 +478,6 @@ soc/soc.h
 soc.h
 /home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/soc.h
 
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/gpio_sd_reg.h
-soc.h
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/soc.h
-
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/gpio_sd_struct.h
-stdint.h
--
-
 /home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/gpio_sig_map.h
 
 /home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/gpio_struct.h
@@ -619,16 +493,6 @@ soc.h
 /home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/soc.h
 
 /home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/host_struct.h
-stdint.h
--
-
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/i2c_caps.h
-
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/i2c_reg.h
-soc.h
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/soc.h
-
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/i2c_struct.h
 stdint.h
 -
 
@@ -666,27 +530,11 @@ soc.h
 stdint.h
 -
 
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/mpu_caps.h
-
 /home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/nrx_reg.h
 soc/soc.h
 /home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/soc/soc.h
 
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/pcnt_reg.h
-soc.h
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/soc.h
-
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/pcnt_struct.h
-stdint.h
--
-
 /home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/periph_defs.h
-
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/rmt_caps.h
-
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/rmt_struct.h
-stdint.h
--
 
 /home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/rtc.h
 stdbool.h
@@ -727,8 +575,6 @@ soc.h
 /home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/sens_struct.h
 stdint.h
 -
-
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/sigmadelta_caps.h
 
 /home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/slc_reg.h
 soc.h
@@ -846,16 +692,6 @@ soc/gpio_caps.h
 soc/gpio_sig_map.h
 /home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/gpio_sig_map.h
 
-/home/gyula/esp/esp-idf/components/soc/soc/include/soc/i2c_periph.h
-soc/i2c_reg.h
-/home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/i2c_reg.h
-soc/i2c_struct.h
-/home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/i2c_struct.h
-soc/i2c_caps.h
-/home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/i2c_caps.h
-soc/periph_defs.h
-/home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/periph_defs.h
-
 /home/gyula/esp/esp-idf/components/soc/soc/include/soc/i2s_periph.h
 soc/soc.h
 /home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/soc.h
@@ -881,12 +717,6 @@ soc/mcpwm_reg.h
 /home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/mcpwm_reg.h
 soc/mcpwm_struct.h
 /home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/mcpwm_struct.h
-
-/home/gyula/esp/esp-idf/components/soc/soc/include/soc/pcnt_periph.h
-soc/pcnt_reg.h
-/home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/pcnt_reg.h
-soc/pcnt_struct.h
-/home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/pcnt_struct.h
 
 /home/gyula/esp/esp-idf/components/soc/soc/include/soc/rtc_cntl_periph.h
 soc/rtc_cntl_reg.h
@@ -927,12 +757,6 @@ soc/sens_reg.h
 /home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/sens_reg.h
 soc/sens_struct.h
 /home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/sens_struct.h
-
-/home/gyula/esp/esp-idf/components/soc/soc/include/soc/sigmadelta_periph.h
-soc/gpio_sd_struct.h
-/home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/gpio_sd_struct.h
-soc/gpio_sd_reg.h
-/home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/gpio_sd_reg.h
 
 /home/gyula/esp/esp-idf/components/soc/soc/include/soc/spi_periph.h
 stdint.h
@@ -1098,26 +922,6 @@ soc/rtc_io_reg.h
 hal/gpio_types.h
 /home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/hal/gpio_types.h
 
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/i2c_ll.h
-soc/i2c_periph.h
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/soc/i2c_periph.h
-hal/i2c_types.h
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/hal/i2c_types.h
-
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/i2s_ll.h
-stdbool.h
--
-soc/rtc_periph.h
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/soc/rtc_periph.h
-soc/rtc.h
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/soc/rtc.h
-soc/efuse_periph.h
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/soc/efuse_periph.h
-soc/i2s_periph.h
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/soc/i2s_periph.h
-hal/i2s_types.h
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/hal/i2s_types.h
-
 /home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/ledc_ll.h
 hal/ledc_types.h
 /home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/hal/ledc_types.h
@@ -1138,14 +942,6 @@ hal/hal_defs.h
 esp_types.h
 /home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/esp_types.h
 
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/mpu_ll.h
-stdint.h
--
-soc/mpu_caps.h
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/soc/mpu_caps.h
-xt_instr_macros.h
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/xt_instr_macros.h
-
 /home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/mwdt_ll.h
 stdint.h
 -
@@ -1158,30 +954,6 @@ hal/wdt_types.h
 esp_attr.h
 /home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/esp_attr.h
 
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/pcnt_ll.h
-soc/pcnt_periph.h
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/soc/pcnt_periph.h
-hal/pcnt_types.h
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/hal/pcnt_types.h
-
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/rmt_ll.h
-stdbool.h
--
-soc/rmt_struct.h
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/soc/rmt_struct.h
-soc/rmt_caps.h
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/soc/rmt_caps.h
-
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/rtc_io_ll.h
-stdlib.h
--
-soc/rtc_io_periph.h
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/soc/rtc_io_periph.h
-hal/rtc_io_types.h
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/hal/rtc_io_types.h
-hal/gpio_types.h
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/hal/gpio_types.h
-
 /home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/rwdt_ll.h
 stdlib.h
 -
@@ -1193,14 +965,6 @@ soc/rtc_cntl_periph.h
 /home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/soc/rtc_cntl_periph.h
 esp_attr.h
 /home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/esp_attr.h
-
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/sigmadelta_ll.h
-stdbool.h
--
-soc/sigmadelta_periph.h
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/soc/sigmadelta_periph.h
-hal/sigmadelta_types.h
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/hal/sigmadelta_types.h
 
 /home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/soc_ll.h
 soc/soc.h
@@ -1273,12 +1037,6 @@ hal/twai_types.h
 /home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/hal/twai_types.h
 soc/twai_periph.h
 /home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/soc/twai_periph.h
-
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/uart_ll.h
-hal/uart_types.h
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/hal/uart_types.h
-soc/uart_periph.h
-/home/gyula/esp/esp-idf/components/soc/src/esp32/include/hal/soc/uart_periph.h
 
 /home/gyula/esp/esp-idf/components/soc/src/esp32/rtc_clk.c
 stdbool.h
@@ -1378,14 +1136,6 @@ soc/efuse_periph.h
 soc/gpio_periph.h
 /home/gyula/esp/esp-idf/components/soc/src/esp32/soc/gpio_periph.h
 
-/home/gyula/esp/esp-idf/components/soc/src/esp32/rtc_pm.c
-stdint.h
--
-assert.h
--
-soc/rtc.h
-/home/gyula/esp/esp-idf/components/soc/src/esp32/soc/rtc.h
-
 /home/gyula/esp/esp-idf/components/soc/src/esp32/rtc_sleep.c
 stdint.h
 -
@@ -1423,12 +1173,6 @@ soc/timer_periph.h
 /home/gyula/esp/esp-idf/components/soc/src/esp32/soc/timer_periph.h
 soc_log.h
 /home/gyula/esp/esp-idf/components/soc/src/esp32/soc_log.h
-
-/home/gyula/esp/esp-idf/components/soc/src/esp32/rtc_wdt.c
-soc/rtc_wdt.h
-/home/gyula/esp/esp-idf/components/soc/src/esp32/soc/rtc_wdt.h
-soc/rtc.h
-/home/gyula/esp/esp-idf/components/soc/src/esp32/soc/rtc.h
 
 /home/gyula/esp/esp-idf/components/soc/src/esp32/soc_memory_layout.c
 stdlib.h
@@ -1478,28 +1222,6 @@ esp32s2/rom/ets_sys.h
 hal/dac_hal.h
 /home/gyula/esp/esp-idf/components/soc/src/hal/hal/dac_hal.h
 
-/home/gyula/esp/esp-idf/components/soc/src/hal/gpio_hal.c
-soc/soc.h
-/home/gyula/esp/esp-idf/components/soc/src/hal/soc/soc.h
-soc/gpio_periph.h
-/home/gyula/esp/esp-idf/components/soc/src/hal/soc/gpio_periph.h
-hal/gpio_hal.h
-/home/gyula/esp/esp-idf/components/soc/src/hal/hal/gpio_hal.h
-
-/home/gyula/esp/esp-idf/components/soc/src/hal/i2c_hal.c
-hal/i2c_hal.h
-/home/gyula/esp/esp-idf/components/soc/src/hal/hal/i2c_hal.h
-
-/home/gyula/esp/esp-idf/components/soc/src/hal/i2c_hal_iram.c
-hal/i2c_hal.h
-/home/gyula/esp/esp-idf/components/soc/src/hal/hal/i2c_hal.h
-
-/home/gyula/esp/esp-idf/components/soc/src/hal/i2s_hal.c
-soc/soc.h
-/home/gyula/esp/esp-idf/components/soc/src/hal/soc/soc.h
-hal/i2s_hal.h
-/home/gyula/esp/esp-idf/components/soc/src/hal/hal/i2s_hal.h
-
 /home/gyula/esp/esp-idf/components/soc/src/hal/ledc_hal.c
 esp_attr.h
 /home/gyula/esp/esp-idf/components/soc/src/hal/esp_attr.h
@@ -1515,36 +1237,6 @@ hal/ledc_hal.h
 /home/gyula/esp/esp-idf/components/soc/src/hal/mcpwm_hal.c
 hal/mcpwm_hal.h
 /home/gyula/esp/esp-idf/components/soc/src/hal/hal/mcpwm_hal.h
-
-/home/gyula/esp/esp-idf/components/soc/src/hal/mpu_hal.c
-stdlib.h
--
-stdint.h
--
-esp_err.h
-/home/gyula/esp/esp-idf/components/soc/src/hal/esp_err.h
-hal/mpu_hal.h
-/home/gyula/esp/esp-idf/components/soc/src/hal/hal/mpu_hal.h
-hal/mpu_ll.h
-/home/gyula/esp/esp-idf/components/soc/src/hal/hal/mpu_ll.h
-hal/mpu_types.h
-/home/gyula/esp/esp-idf/components/soc/src/hal/hal/mpu_types.h
-soc/mpu_caps.h
-/home/gyula/esp/esp-idf/components/soc/src/hal/soc/mpu_caps.h
-
-/home/gyula/esp/esp-idf/components/soc/src/hal/pcnt_hal.c
-hal/pcnt_hal.h
-/home/gyula/esp/esp-idf/components/soc/src/hal/hal/pcnt_hal.h
-
-/home/gyula/esp/esp-idf/components/soc/src/hal/rmt_hal.c
-hal/rmt_hal.h
-/home/gyula/esp/esp-idf/components/soc/src/hal/hal/rmt_hal.h
-hal/rmt_ll.h
-/home/gyula/esp/esp-idf/components/soc/src/hal/hal/rmt_ll.h
-
-/home/gyula/esp/esp-idf/components/soc/src/hal/rtc_io_hal.c
-hal/rtc_io_hal.h
-/home/gyula/esp/esp-idf/components/soc/src/hal/hal/rtc_io_hal.h
 
 /home/gyula/esp/esp-idf/components/soc/src/hal/sdio_slave_hal.c
 soc/slc_struct.h
@@ -1563,14 +1255,6 @@ hal/hal_defs.h
 /home/gyula/esp/esp-idf/components/soc/src/hal/hal/hal_defs.h
 esp_attr.h
 /home/gyula/esp/esp-idf/components/soc/src/hal/esp_attr.h
-
-/home/gyula/esp/esp-idf/components/soc/src/hal/sigmadelta_hal.c
-stdio.h
--
-soc/soc.h
-/home/gyula/esp/esp-idf/components/soc/src/hal/soc/soc.h
-hal/sigmadelta_hal.h
-/home/gyula/esp/esp-idf/components/soc/src/hal/hal/sigmadelta_hal.h
 
 /home/gyula/esp/esp-idf/components/soc/src/hal/soc_hal.c
 stdint.h
@@ -1649,14 +1333,6 @@ stddef.h
 -
 hal/twai_hal.h
 /home/gyula/esp/esp-idf/components/soc/src/hal/hal/twai_hal.h
-
-/home/gyula/esp/esp-idf/components/soc/src/hal/uart_hal.c
-hal/uart_hal.h
-/home/gyula/esp/esp-idf/components/soc/src/hal/hal/uart_hal.h
-
-/home/gyula/esp/esp-idf/components/soc/src/hal/uart_hal_iram.c
-hal/uart_hal.h
-/home/gyula/esp/esp-idf/components/soc/src/hal/hal/uart_hal.h
 
 /home/gyula/esp/esp-idf/components/soc/src/hal/wdt_hal_iram.c
 string.h
