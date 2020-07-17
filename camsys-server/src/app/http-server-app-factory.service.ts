@@ -39,7 +39,7 @@ export class HttpServerAppFactoryService {
             req.body.watcher
           );
           HttpServerAppFactoryService.lastCaller.refreshDeviceList();
-          res.send('HELLO POSTER : ' + camDevice.id);
+          res.send(HttpServerAppFactoryService.lastCaller.getMessageToDevice(camDevice));
         }
       });
 

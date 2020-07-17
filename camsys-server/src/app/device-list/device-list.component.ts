@@ -2,21 +2,26 @@ import { Component, OnInit } from '@angular/core';
 import { HttpServerAppFactoryService } from '../http-server-app-factory.service';
 
 class CamDeviceWatcher {
-  x: number;
-  y: number;
-  size: number;
-  raster: number;
-  threshold: number;
+  x: number = 43;
+  y: number = 43;
+  size: number = 10;
+  raster: number = 5;
+  threshold: number = 250;
+}
+
+class CamUserSet {
+  watcher: CamDeviceWatcher = new CamDeviceWatcher();
 }
 
 class CamDevice {
   id: string;
   type: string;
-  name: string;
+  name: string = "Unnamed";
   updatedAt: number;
   status: string;
   diff: number;
   watcher: CamDeviceWatcher = new CamDeviceWatcher();
+  userSet: CamUserSet = new CamUserSet();
 }
 
 class CamDeviceList {
@@ -40,7 +45,7 @@ class CamDeviceList {
       foundDevice = new CamDevice();
       this.addCamDevice(foundDevice);
     }
-  
+
     foundDevice.id = id;
     foundDevice.updatedAt = Math.round((new Date()).getTime());
     foundDevice.type = type;
@@ -57,6 +62,51 @@ class CamDeviceList {
   }
 }
 
+class IntervalTimer {
+
+  private timerId: number;
+  private startTime: number;
+  private remaining = 0;
+  private state = 0; //  0 = idle, 1 = running, 2 = paused, 3= resumed
+
+  constructor(private callback: Function, private interval: number) {
+    this.startTime = IntervalTimer.getNow();
+    this.timerId = window.setInterval(callback, interval);
+    this.state = 1;
+  }
+
+  private static getNow(): number {
+    return Math.round((new Date()).getTime())
+  }
+
+  pause() {
+    if (this.state != 1) return;
+
+    this.remaining = this.interval - (IntervalTimer.getNow() - this.startTime);
+    window.clearInterval(this.timerId);
+    this.state = 2;
+  }
+
+  resume() {
+    if (this.state != 2) return;
+
+    this.state = 3;
+    window.setTimeout(this.timeoutCallback, this.remaining);
+  }
+
+  timeoutCallback() {
+    if (this.state != 3) return;
+
+    this.callback();
+
+    this.startTime = IntervalTimer.getNow();
+    this.timerId = window.setInterval(this.callback, this.interval);
+    this.state = 1;
+  }
+
+}
+
+
 @Component({
   selector: 'cam-device-list',
   templateUrl: './device-list.component.html',
@@ -67,13 +117,17 @@ export class DeviceListComponent implements OnInit {
 
   camDeviceList: CamDeviceList = new CamDeviceList();
 
+  refreshTimer: IntervalTimer;
+
+  userInCamDeviceSetField = false;
+
   constructor(private httpServerAppFactory: HttpServerAppFactoryService) {
-console.log("CONSTRUCT");
+
     this.httpServerAppFactory.getHttpServerApp(this);
 
     this.loadDeviceList();
-    
-    setInterval(() => {
+
+    this.refreshTimer = new IntervalTimer(() => {
       let now = Math.round((new Date()).getTime());
       this.camDeviceList.camDevices.forEach((camDevice) => {
         camDevice.status = 'connected';
@@ -87,12 +141,13 @@ console.log("CONSTRUCT");
   }
 
   ngOnInit(): void {
-    console.log("NG ON INIT");
   }
 
   refreshDeviceList() {
-    localStorage.setItem('camDevices', JSON.stringify(this.camDeviceList.camDevices));
-    this.loadDeviceList();
+    if (!this.userInCamDeviceSetField) {
+      localStorage.setItem('camDevices', JSON.stringify(this.camDeviceList.camDevices));
+      this.loadDeviceList();
+    }
   }
 
   loadDeviceList() {
@@ -111,6 +166,24 @@ console.log("CONSTRUCT");
       this.camDeviceList.camDevices = tmp;
       this.refreshDeviceList();
     }, 500);
+  }
+
+  getMessageToDevice(camDevice: CamDevice): string {
+    let message = "";
+    if (camDevice.type === 'motion') {
+      Object.keys(camDevice.watcher).forEach((key) => {
+        if (camDevice.watcher[key] != camDevice.userSet.watcher[key]) {
+          message += "watcher." + key + "=" + camDevice.userSet.watcher[key] + "\n";
+        }
+      });
+    } else if (camDevice.type === 'camera') {
+      // TODO ....
+      console.error('camera response should be implemented');
+    } else {
+      console.error("Incorrect device type: " + camDevice.type);
+    }
+    console.log("MESSAGE:", message);
+    return message;
   }
 
 }

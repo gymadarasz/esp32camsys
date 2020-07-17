@@ -10,7 +10,7 @@
         <br>
 
         <label>Name:</label>
-        {{ camDevice.name }}
+        <input type="text" [(ngModel)]="camDevice.name" (focus)="userInCamDeviceSetField = true" (blur)="userInCamDeviceSetField = false">
         <br>
 
         <label>Updated At:</label>
@@ -26,15 +26,59 @@
             {{ camDevice.diff }}
             <br>
 
-            <label>Watcher:</label>
             <div>
-                <label>X:</label> {{ camDevice.watcher.x }}<br>
-                <label>Y:</label> {{ camDevice.watcher.y }}<br>
-                <label>Size:</label> {{ camDevice.watcher.size }}<br>
-                <label>Raster:</label> {{ camDevice.watcher.raster }}<br>
-                <label>Threshold:</label> {{ camDevice.watcher.threshold }}<br>
+                <label>Watcher:</label><br>
+                <label>X:</label> 
+                <ng-template [ngIf]="camDevice.watcher.x  == camDevice.userSet.watcher.x">
+                    {{ camDevice.watcher.x }}
+                </ng-template>
+                <ng-template [ngIf]="camDevice.watcher.x  != camDevice.userSet.watcher.x">
+                    ...
+                </ng-template> 
+                <input type="number" [(ngModel)]="camDevice.userSet.watcher.x" (focus)="userInCamDeviceSetField = true" (blur)="userInCamDeviceSetField = false">
+                <br>
+
+                <label>Y:</label> 
+                <ng-template [ngIf]="camDevice.watcher.y  == camDevice.userSet.watcher.y">
+                    {{ camDevice.watcher.y }}
+                </ng-template>
+                <ng-template [ngIf]="camDevice.watcher.y  != camDevice.userSet.watcher.y">
+                    ...
+                </ng-template>
+                <input type="number" [(ngModel)]="camDevice.userSet.watcher.y" (focus)="userInCamDeviceSetField = true" (blur)="userInCamDeviceSetField = false">
+                <br>
+                
+                <label>Size:</label> 
+                <ng-template [ngIf]="camDevice.watcher.size  == camDevice.userSet.watcher.size">
+                    {{ camDevice.watcher.size }}
+                </ng-template>
+                <ng-template [ngIf]="camDevice.watcher.size  != camDevice.userSet.watcher.size">
+                    ...
+                </ng-template>
+                <input type="number" [(ngModel)]="camDevice.userSet.watcher.size" (focus)="userInCamDeviceSetField = true" (blur)="userInCamDeviceSetField = false">
+                <br>
+
+                <label>Raster:</label>
+                <ng-template [ngIf]="camDevice.watcher.raster  == camDevice.userSet.watcher.raster">
+                    {{ camDevice.watcher.raster }}
+                </ng-template>
+                <ng-template [ngIf]="camDevice.watcher.raster  != camDevice.userSet.watcher.raster">
+                    ...
+                </ng-template>
+                <input type="number" [(ngModel)]="camDevice.userSet.watcher.raster" (focus)="userInCamDeviceSetField = true" (blur)="userInCamDeviceSetField = false">
+                <br>
+
+                <label>Threshold:</label> 
+                <ng-template [ngIf]="camDevice.watcher.threshold  == camDevice.userSet.watcher.threshold">
+                    {{ camDevice.watcher.threshold }}
+                </ng-template>
+                <ng-template [ngIf]="camDevice.watcher.threshold  != camDevice.userSet.watcher.threshold">
+                    ...
+                </ng-template>
+                <input type="number" [(ngModel)]="camDevice.userSet.watcher.threshold" (focus)="userInCamDeviceSetField = true" (blur)="userInCamDeviceSetField = false">
+                <br>
             </div>
-            <br>
+
         </ng-template>
 
         <ng-template [ngIf]="camDevice.type == 'camera'">
