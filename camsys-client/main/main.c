@@ -694,8 +694,10 @@ typedef void (*additional_join_post_data_cb_t)(char* buff, size_t size);
 typedef void (*app_main_presetup_func_t)(void);
 
 void app_main_start(
-    nvs_handle_t nvs_handle, 
+    nvs_handle_t nvs_handle,
+    int tickSpeed,
     additional_join_post_data_cb_t additional_join_post_data_cb, 
+    http_response_handler_t http_response_handler,
     app_main_presetup_func_t presetup,
     TaskFunction_t subtask
 ) {
@@ -713,8 +715,8 @@ void app_main_start(
 
     while(1) {
         additional_join_post_data_cb(additional_join_post_data, additional_join_post_data_size);
-        app_http_request_join(nvs_handle, additional_join_post_data, app_http_response_handler);
-        vTaskDelay(3000 / portTICK_RATE_MS);
+        app_http_request_join(nvs_handle, additional_join_post_data, http_response_handler ? http_response_handler : app_http_response_handler);
+        vTaskDelay(tickSpeed / portTICK_RATE_MS);
     }
 
     free(additional_join_post_data);
@@ -782,6 +784,31 @@ static camera_config_t motion_camera_config = {
 };
 
 
+
+
+void motion_init() {
+    
+    //power up the camera if PWDN pin is defined
+    if(CAM_PIN_PWDN != -1){
+        pinMode(CAM_PIN_PWDN, OUTPUT);
+        digitalWrite(CAM_PIN_PWDN, LOW);
+    }
+
+    //initialize the camera
+    ESP_ERROR_CHECK( esp_camera_init(&motion_camera_config) );
+}
+
+void motion_show_diff(size_t diff_sum, bool alert) {
+    char spc[] = "]]]]]]]]]]]]]]]]]]]]]]]]]]]]][";
+    char* s = spc; 
+    for (int i=0; i<29; i++) {
+        if (i*10>diff_sum) s[i] = ' ';
+    }
+    PRINTF("%s (%u) %s", s, diff_sum, alert ? "ALERT!!!" : "");
+}
+
+//----
+
 camera_fb_t * fb = NULL;
 
 
@@ -795,88 +822,96 @@ struct watch_s {
 
 typedef struct watch_s watch_t;
 
+struct motion_state_s {
+    size_t diff_sum_max;
+    watch_t watcher;
+};
 
-void app_main_motion_init() {
-    
-    //power up the camera if PWDN pin is defined
-    if(CAM_PIN_PWDN != -1){
-        pinMode(CAM_PIN_PWDN, OUTPUT);
-        digitalWrite(CAM_PIN_PWDN, LOW);
-    }
+#define WATCH_DEFAULT {43, 43, 10, 5, 100}
 
-    //initialize the camera
-    ESP_ERROR_CHECK( esp_camera_init(&motion_camera_config) );
+typedef struct motion_state_s motion_state_t;
+
+motion_state_t motion_state_last = { 0, WATCH_DEFAULT };
+motion_state_t motion_state = { 0, WATCH_DEFAULT };
+
+
+void motion_additional_join_post_data(char* buff, size_t size) {
+    // strncpy(buff, "type=motion", size);
+
+    motion_state_last.diff_sum_max = motion_state.diff_sum_max; 
+
+    snprintf(buff, size, 
+        "type=motion&"
+        "diff_sum_max=%d&"
+        "watcher[x]=%d&"
+        "watcher[y]=%d&"
+        "watcher[size]=%d&"
+        "watcher[raster]=%d&"
+        "watcher[threshold]=%d&", 
+        motion_state_last.diff_sum_max,
+        motion_state.watcher.x,
+        motion_state.watcher.y,
+        motion_state.watcher.size,
+        motion_state.watcher.raster,
+        motion_state.watcher.threshold
+    );
+
 }
 
-void app_main_motion_show_diff(size_t diff_sum) {
-    char spc[] = "]]]]]]]]]]]]]]]]]]]]]]]]]]]]][";
-    char* s = spc; 
-    for (int i=0; i<29; i++) {
-        if (i*10>diff_sum) s[i] = ' ';
-    }
-    PRINTF("%s (%u)", s, diff_sum);
+void motion_join_response_handler(char* buff, size_t size) {
+    PRINTF("RESPONSE STRING LENGTH: %d, BUFF_SIZE: %d\nRESPONE:\n%s", strlen(buff), size, buff);
+
+    if (motion_state.diff_sum_max <= motion_state_last.diff_sum_max) motion_state.diff_sum_max = 0;
 }
 
-//----
 
-void app_main_motion_additional_join_post_data(char* buff, size_t size) {
-    strncpy(buff, "type=motion", size);
-}
-
-void app_main_motion_setup() {
+void motion_setup() {
     PRINT("CAMERA INIT...");
-    app_main_motion_init();
+    motion_init();
     PRINT("CAMERA INIT...OK");
 }
 
-void app_main_motion_loop(void * pvParameters) {
+void motion_loop(void * pvParameters) {
 
-    PRINT("START app_main_motion_loop...");
+    PRINT("START motion_loop...");
 
-    watch_t watcher = {43, 43, 10, 5, 100};
+    //watch_t watcher = {43, 43, 10, 5, 100};
     static const int watcher_size_max = 40;
-    uint8_t prev_buf[40*40*4];
-
     static const size_t buff_size = watcher_size_max*watcher_size_max*4;
+    uint8_t prev_buf[buff_size];
 
-    size_t diff_sum_max = 0;
-
-
-    // int counter = 0;
     while(1) {
-        // PRINTF("counter:%d", counter++);
-        // vTaskDelay(1000 / portTICK_RATE_MS);
-
 
         fb = esp_camera_fb_get();            
         if (!fb) PRINT("Motion Camera capture failed");
         
-        int xfrom = watcher.x - watcher.size;
-        int xto = watcher.x + watcher.size;
-        int yfrom = watcher.y - watcher.size;
-        int yto = watcher.y + watcher.size;
+        int xfrom = motion_state.watcher.x - motion_state.watcher.size;
+        int xto = motion_state.watcher.x + motion_state.watcher.size;
+        int yfrom = motion_state.watcher.y - motion_state.watcher.size;
+        int yto = motion_state.watcher.y + motion_state.watcher.size;
         int i=0;
         size_t diff_sum = 0;
-        for (int x=xfrom; x<xto; x+=watcher.raster) {
-            for (int y=yfrom; y<yto; y+=watcher.raster) {
+        for (int x=xfrom; x<xto; x+=motion_state.watcher.raster) {
+            for (int y=yfrom; y<yto; y+=motion_state.watcher.raster) {
                 int diff = fb->buf[x+y*fb->width] - prev_buf[i];
                 diff_sum += (diff > 0 ? diff : -diff);
-                prev_buf[i] = fb->buf[x+y*fb->width];
-                i++;
                 if (i>=buff_size) {
                     PRINT("buff size too large");
                     break;
                 }
+                prev_buf[i] = fb->buf[x+y*fb->width];
+                i++;
             }
         }
 
-        if (diff_sum_max < diff_sum) diff_sum_max = diff_sum;
+        if (motion_state.diff_sum_max < diff_sum) motion_state.diff_sum_max = diff_sum;
         
-        app_main_motion_show_diff(diff_sum);
-        if (diff_sum >= watcher.threshold) {
-            PRINT("******************************************************");
-            PRINT("*********************** [ALERT] **********************");
-            PRINT("******************************************************");
+        bool alert = diff_sum >= motion_state.watcher.threshold;
+        motion_show_diff(diff_sum, alert);
+        if (alert) {
+            // PRINT("******************************************************");
+            // PRINT("*********************** [ALERT] **********************");
+            // PRINT("******************************************************");
         }
         
         esp_camera_fb_return(fb);
@@ -899,7 +934,7 @@ void app_main()
     int camera_button_state = !gpio_get_level(GPIO_NUM_13);
 
     if (motion_button_state) 
-        app_main_start(nvs_handle, app_main_motion_additional_join_post_data, app_main_motion_setup, app_main_motion_loop); //wifi_websocket_client_app_start(motion_sensor_setup, motion_sensor_loop, motion_sensor_data, motion_sensor_connected, motion_sensor_disconnected, motion_sensor_error);
+        app_main_start(nvs_handle, 500, motion_additional_join_post_data, motion_join_response_handler, motion_setup, motion_loop); //wifi_websocket_client_app_start(motion_sensor_setup, motion_sensor_loop, motion_sensor_data, motion_sensor_connected, motion_sensor_disconnected, motion_sensor_error);
     else if (camera_button_state) 
         printf("CAMERA MODE...\n"); //wifi_websocket_client_app_start(camera_recorder_setup, camera_recorder_loop, camera_recorder_data, camera_recorder_connected, camera_recorder_disconnected, camera_recorder_error);
     else 

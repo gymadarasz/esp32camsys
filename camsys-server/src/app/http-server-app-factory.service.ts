@@ -16,7 +16,11 @@ export class HttpServerAppFactoryService {
 
   static httpServerApp: any = null;
 
+  static lastCaller: DeviceListComponent;
+
   getHttpServerApp(caller: DeviceListComponent) {
+    HttpServerAppFactoryService.lastCaller = caller;
+
     if (!HttpServerAppFactoryService.httpServerApp) {
       HttpServerAppFactoryService.httpServerApp = this.express();
       HttpServerAppFactoryService.httpServerApp.use(this.bodyParser.urlencoded({
@@ -26,11 +30,17 @@ export class HttpServerAppFactoryService {
       HttpServerAppFactoryService.httpServerApp.post('/join', (req: any, res: any) => {
         console.log("POST", req, res);
         if (req.body.secret !== this.getSecret()) {
-          throw 'Invalid secret';
+          console.error('Invalid secret');
+        } else {
+          let camDevice = HttpServerAppFactoryService.lastCaller.camDeviceList.joinDevice(
+            req.body.client, 
+            req.body.type, 
+            req.body.diff_sum_max, 
+            req.body.watcher
+          );
+          HttpServerAppFactoryService.lastCaller.refreshDeviceList();
+          res.send('HELLO POSTER : ' + camDevice.id);
         }
-        caller.camDeviceList.joinDevice(req.body.client, req.body.type);
-        caller.refreshDeviceList();
-        res.send('HELLO POSTER');
       });
 
       // this.httpServerApp.get('/join/:id', (req: any, res: any) => {

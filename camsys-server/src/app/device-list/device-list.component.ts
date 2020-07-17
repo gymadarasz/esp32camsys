@@ -1,14 +1,22 @@
 import { Component, OnInit } from '@angular/core';
 import { HttpServerAppFactoryService } from '../http-server-app-factory.service';
 
-class CamDevice {
+class CamDeviceWatcher {
+  x: number;
+  y: number;
+  size: number;
+  raster: number;
+  threshold: number;
+}
 
+class CamDevice {
   id: string;
   type: string;
   name: string;
-  connectedAt: number;
+  updatedAt: number;
   status: string;
-
+  diff: number;
+  watcher: CamDeviceWatcher = new CamDeviceWatcher();
 }
 
 class CamDeviceList {
@@ -19,21 +27,30 @@ class CamDeviceList {
     this.camDevices.push(camDevice);
   }
 
-  joinDevice(id: string, type: string): CamDevice | null {
+  joinDevice(id: string, type: string, diffSumMax: number, watcher: CamDeviceWatcher): CamDevice | null {
     let foundDevice: CamDevice = null;
     this.camDevices.forEach((camDevice) => {
       if (!foundDevice && camDevice.id === id) {
-        camDevice.connectedAt = Math.round((new Date()).getTime());
+        //camDevice.connectedAt = Math.round((new Date()).getTime());
         foundDevice = camDevice;
       }
     });
 
     if (!foundDevice) {
       foundDevice = new CamDevice();
-      foundDevice.id = id;
-      foundDevice.type = type;
-      foundDevice.connectedAt = Math.round((new Date()).getTime());
       this.addCamDevice(foundDevice);
+    }
+  
+    foundDevice.id = id;
+    foundDevice.updatedAt = Math.round((new Date()).getTime());
+    foundDevice.type = type;
+    if (type === 'motion') {
+      foundDevice.diff = diffSumMax;
+      foundDevice.watcher = watcher;
+    } else if (type === 'camera') {
+      // TODO...
+    } else {
+      console.error('Invalid type: ', type);
     }
 
     return foundDevice;
@@ -51,23 +68,26 @@ export class DeviceListComponent implements OnInit {
   camDeviceList: CamDeviceList = new CamDeviceList();
 
   constructor(private httpServerAppFactory: HttpServerAppFactoryService) {
-    this.loadDeviceList();
-
+console.log("CONSTRUCT");
     this.httpServerAppFactory.getHttpServerApp(this);
 
+    this.loadDeviceList();
+    
     setInterval(() => {
       let now = Math.round((new Date()).getTime());
       this.camDeviceList.camDevices.forEach((camDevice) => {
         camDevice.status = 'connected';
-        console.log(now, camDevice.connectedAt, now - camDevice.connectedAt);
-        if (now - camDevice.connectedAt > 10000) {
+        console.log(now, camDevice.updatedAt, now - camDevice.updatedAt);
+        if (now - camDevice.updatedAt > 10000) {
           camDevice.status = '...';
         }
       });
-    }, 5000);
+    }, 500);
+
   }
 
   ngOnInit(): void {
+    console.log("NG ON INIT");
   }
 
   refreshDeviceList() {

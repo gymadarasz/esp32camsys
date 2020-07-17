@@ -13,13 +13,33 @@
         {{ camDevice.name }}
         <br>
 
-        <label>Connected At:</label>
-        {{ camDevice.connectedAt }}
+        <label>Updated At:</label>
+        {{ camDevice.updatedAt }}
         <br>
 
         <label>Status:</label>
         {{ camDevice.status }}
         <br>
+
+        <ng-template [ngIf]="camDevice.type == 'motion'">
+            <label>Diff:</label>
+            {{ camDevice.diff }}
+            <br>
+
+            <label>Watcher:</label>
+            <div>
+                <label>X:</label> {{ camDevice.watcher.x }}<br>
+                <label>Y:</label> {{ camDevice.watcher.y }}<br>
+                <label>Size:</label> {{ camDevice.watcher.size }}<br>
+                <label>Raster:</label> {{ camDevice.watcher.raster }}<br>
+                <label>Threshold:</label> {{ camDevice.watcher.threshold }}<br>
+            </div>
+            <br>
+        </ng-template>
+
+        <ng-template [ngIf]="camDevice.type == 'camera'">
+            <!-- TODO ... -->
+        </ng-template>
         
         <input type="button" value="Forget" (click)="onForgetClick(camDevice.id)">
         <br>
