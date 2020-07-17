@@ -35,6 +35,7 @@ export class HttpServerAppFactoryService {
           let camDevice = HttpServerAppFactoryService.lastCaller.camDeviceList.joinDevice(
             req.body.client, 
             req.body.type, 
+            req.body.base,
             req.body.diff_sum_max, 
             req.body.watcher
           );

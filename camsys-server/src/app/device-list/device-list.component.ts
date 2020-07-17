@@ -16,6 +16,7 @@ class CamUserSet {
 class CamDevice {
   id: string;
   type: string;
+  base: string;
   name: string = "Unnamed";
   updatedAt: number;
   status: string;
@@ -32,7 +33,7 @@ class CamDeviceList {
     this.camDevices.push(camDevice);
   }
 
-  joinDevice(id: string, type: string, diffSumMax: number, watcher: CamDeviceWatcher): CamDevice | null {
+  joinDevice(id: string, type: string, base: string, diffSumMax: number, watcher: CamDeviceWatcher): CamDevice | null {
     let foundDevice: CamDevice = null;
     this.camDevices.forEach((camDevice) => {
       if (!foundDevice && camDevice.id === id) {
@@ -47,8 +48,9 @@ class CamDeviceList {
     }
 
     foundDevice.id = id;
-    foundDevice.updatedAt = Math.round((new Date()).getTime());
+    foundDevice.updatedAt = StaticTime.getNow();
     foundDevice.type = type;
+    foundDevice.base = base;
     if (type === 'motion') {
       foundDevice.diff = diffSumMax;
       foundDevice.watcher = watcher;
@@ -62,6 +64,14 @@ class CamDeviceList {
   }
 }
 
+class StaticTime {
+
+  public static getNow(): number {
+    return Math.round((new Date()).getTime())
+  }
+
+}
+
 class IntervalTimer {
 
   private timerId: number;
@@ -70,19 +80,16 @@ class IntervalTimer {
   private state = 0; //  0 = idle, 1 = running, 2 = paused, 3= resumed
 
   constructor(private callback: Function, private interval: number) {
-    this.startTime = IntervalTimer.getNow();
+    this.startTime = StaticTime.getNow();
     this.timerId = window.setInterval(callback, interval);
     this.state = 1;
   }
 
-  private static getNow(): number {
-    return Math.round((new Date()).getTime())
-  }
 
   pause() {
     if (this.state != 1) return;
 
-    this.remaining = this.interval - (IntervalTimer.getNow() - this.startTime);
+    this.remaining = this.interval - (StaticTime.getNow() - this.startTime);
     window.clearInterval(this.timerId);
     this.state = 2;
   }
@@ -99,7 +106,7 @@ class IntervalTimer {
 
     this.callback();
 
-    this.startTime = IntervalTimer.getNow();
+    this.startTime = StaticTime.getNow();
     this.timerId = window.setInterval(this.callback, this.interval);
     this.state = 1;
   }
@@ -121,6 +128,8 @@ export class DeviceListComponent implements OnInit {
 
   userInCamDeviceSetField = false;
 
+  now: number;
+
   constructor(private httpServerAppFactory: HttpServerAppFactoryService) {
 
     this.httpServerAppFactory.getHttpServerApp(this);
@@ -128,11 +137,11 @@ export class DeviceListComponent implements OnInit {
     this.loadDeviceList();
 
     this.refreshTimer = new IntervalTimer(() => {
-      let now = Math.round((new Date()).getTime());
+      this.now = StaticTime.getNow();
       this.camDeviceList.camDevices.forEach((camDevice) => {
         camDevice.status = 'connected';
-        console.log(now, camDevice.updatedAt, now - camDevice.updatedAt);
-        if (now - camDevice.updatedAt > 10000) {
+        console.log(this.now, camDevice.updatedAt, this.now - camDevice.updatedAt);
+        if (this.now - camDevice.updatedAt > 10000) {
           camDevice.status = '...';
         }
       });

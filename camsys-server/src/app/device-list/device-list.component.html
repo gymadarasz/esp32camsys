@@ -9,6 +9,10 @@
         {{ camDevice.type }}
         <br>
 
+        <label>Base:</label>
+        {{ camDevice.base }}
+        <br>
+
         <label>Name:</label>
         <input type="text" [(ngModel)]="camDevice.name" (focus)="userInCamDeviceSetField = true" (blur)="userInCamDeviceSetField = false">
         <br>
@@ -78,6 +82,9 @@
                 <input type="number" [(ngModel)]="camDevice.userSet.watcher.threshold" (focus)="userInCamDeviceSetField = true" (blur)="userInCamDeviceSetField = false">
                 <br>
             </div>
+
+            <img src="http://{{ camDevice.base }}/image?ts={{ now }}">
+            <br>
 
         </ng-template>
 

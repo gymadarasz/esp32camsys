@@ -402,7 +402,7 @@ void app_main_settings(nvs_handle_t nvs_handle)
 
 
 bool wifi_connected = false;
-static ip4_addr_t wifi_ip_addr;
+ip4_addr_t wifi_ip_addr;
 
 void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
     //PRINTF("WIFI: ***EVENT (%ld)", event_id);
@@ -676,8 +676,12 @@ bool app_http_request_join(nvs_handle_t nvs_handle, const char* additional_join_
     uint16_t http_port = nvs_getu16(nvs_handle, "http_port", 3000); // TODO add to settings
     char* secret = nvs_gets(nvs_handle, "secret");
 
+    const size_t ipbuff_size = 32;
+    char ipbuff[ipbuff_size];
+    ip4addr_ntoa_r(&wifi_ip_addr, &ipbuff, ipbuff_size);
+
     snprintf(url, strmax, "%s://%s:%d/join", http_prefix, host, http_port);
-    snprintf(post_data, strmax, "client=%s&secret=%s&%s", uids, secret, additional_join_post_data);
+    snprintf(post_data, strmax, "client=%s&secret=%s&base=%s&%s", uids, secret, ipbuff, additional_join_post_data);
 
     PRINTF("HTTP POST: %s\nPOST DATA: %s", url, post_data);
     bool ret = http_request(HTTP_METHOD_POST, url, post_data, http_response_handler);
