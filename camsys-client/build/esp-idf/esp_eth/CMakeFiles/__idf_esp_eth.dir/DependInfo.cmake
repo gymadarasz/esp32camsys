@@ -5,9 +5,11 @@ set(CMAKE_DEPENDS_LANGUAGES
 # The set of files for implicit dependencies of each language:
 set(CMAKE_DEPENDS_CHECK_C
   "/home/gyula/esp/esp-idf/components/esp_eth/src/esp_eth.c" "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth.c.obj"
+  "/home/gyula/esp/esp-idf/components/esp_eth/src/esp_eth_mac_dm9051.c" "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_mac_dm9051.c.obj"
   "/home/gyula/esp/esp-idf/components/esp_eth/src/esp_eth_mac_esp32.c" "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_mac_esp32.c.obj"
   "/home/gyula/esp/esp-idf/components/esp_eth/src/esp_eth_netif_glue.c" "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_netif_glue.c.obj"
   "/home/gyula/esp/esp-idf/components/esp_eth/src/esp_eth_phy.c" "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy.c.obj"
+  "/home/gyula/esp/esp-idf/components/esp_eth/src/esp_eth_phy_dm9051.c" "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_dm9051.c.obj"
   "/home/gyula/esp/esp-idf/components/esp_eth/src/esp_eth_phy_dp83848.c" "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_dp83848.c.obj"
   "/home/gyula/esp/esp-idf/components/esp_eth/src/esp_eth_phy_ip101.c" "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_ip101.c.obj"
   "/home/gyula/esp/esp-idf/components/esp_eth/src/esp_eth_phy_lan8720.c" "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_lan8720.c.obj"

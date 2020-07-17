@@ -1470,6 +1470,19 @@ __idf_wifi_provisioning/fast:
 .PHONY : __idf_wifi_provisioning/fast
 
 #=============================================================================
+# Target rules for targets named __idf_protocol_examples_common
+
+# Build rule for target.
+__idf_protocol_examples_common: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 __idf_protocol_examples_common
+.PHONY : __idf_protocol_examples_common
+
+# fast build rule for target.
+__idf_protocol_examples_common/fast:
+	$(MAKE) -f esp-idf/protocol_examples_common/CMakeFiles/__idf_protocol_examples_common.dir/build.make esp-idf/protocol_examples_common/CMakeFiles/__idf_protocol_examples_common.dir/build
+.PHONY : __idf_protocol_examples_common/fast
+
+#=============================================================================
 # Target rules for targets named __idf_main
 
 # Build rule for target.
@@ -1622,6 +1635,7 @@ help:
 	@echo "... __idf_ulp"
 	@echo "... __idf_unity"
 	@echo "... __idf_wifi_provisioning"
+	@echo "... __idf_protocol_examples_common"
 	@echo "... __idf_main"
 	@echo "... project_elf_src.obj"
 	@echo "... project_elf_src.i"

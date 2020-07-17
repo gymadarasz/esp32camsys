@@ -1,12 +1,10 @@
 file(REMOVE_RECURSE
   "CMakeFiles/mbedcrypto.dir/__/__/port/esp32/aes.c.obj"
-  "CMakeFiles/mbedcrypto.dir/__/__/port/esp32/bignum.c.obj"
   "CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha1.c.obj"
   "CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha256.c.obj"
   "CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha512.c.obj"
   "CMakeFiles/mbedcrypto.dir/__/__/port/esp32/sha.c.obj"
   "CMakeFiles/mbedcrypto.dir/__/__/port/esp_aes_xts.c.obj"
-  "CMakeFiles/mbedcrypto.dir/__/__/port/esp_bignum.c.obj"
   "CMakeFiles/mbedcrypto.dir/__/__/port/esp_hardware.c.obj"
   "CMakeFiles/mbedcrypto.dir/__/__/port/esp_mem.c.obj"
   "CMakeFiles/mbedcrypto.dir/__/__/port/esp_sha.c.obj"

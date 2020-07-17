@@ -116,7 +116,7 @@ const DRAM_ATTR uint8_t ov2640_settings_cif[][2] = {
     {COM7, COM7_RES_CIF},
     {HSTART, 0x11},
     {HSTOP, 0x43},
-    {VSTART, 0x00},
+    {V_START, 0x00},
     {VSTOP, 0x25},
     {REG32, 0x89},
     {0x37, 0xc0},
@@ -232,7 +232,7 @@ const DRAM_ATTR uint8_t ov2640_settings_to_cif[][2] = {
     {REG32, REG32_CIF},
     {HSTART, 0x11},
     {HSTOP, 0x43},
-    {VSTART, 0x00},
+    {V_START, 0x00},
     {VSTOP, 0x25},
 
     //{CLKRC, 0x00},
@@ -283,7 +283,7 @@ const DRAM_ATTR uint8_t ov2640_settings_to_svga[][2] = {
     {REG32, REG32_SVGA},
     {HSTART, 0x11},
     {HSTOP, 0x43},
-    {VSTART, 0x00},
+    {V_START, 0x00},
     {VSTOP, 0x4b},
 
     //{CLKRC, 0x00},
@@ -336,7 +336,7 @@ const DRAM_ATTR uint8_t ov2640_settings_to_uxga[][2] = {
     {REG32, REG32_UXGA},
     {HSTART, 0x11},
     {HSTOP, 0x75},
-    {VSTART, 0x01},
+    {V_START, 0x01},
     {VSTOP, 0x97},
 
     //{CLKRC, 0x00},

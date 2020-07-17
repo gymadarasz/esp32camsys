@@ -392,11 +392,13 @@ simple.elf: esp-idf/newlib/libnewlib.a
 simple.elf: esp-idf/pthread/libpthread.a
 simple.elf: esp-idf/app_trace/libapp_trace.a
 simple.elf: esp-idf/app_trace/libapp_trace.a
+simple.elf: /home/gyula/esp/esp-idf/components/esp_rom/esp32/ld/esp32.rom.newlib-time.ld
 simple.elf: /home/gyula/esp/esp-idf/components/esp_rom/esp32/ld/esp32.rom.api.ld
 simple.elf: /home/gyula/esp/esp-idf/components/esp_rom/esp32/ld/esp32.rom.ld
 simple.elf: /home/gyula/esp/esp-idf/components/esp_rom/esp32/ld/esp32.rom.libgcc.ld
 simple.elf: /home/gyula/esp/esp-idf/components/esp_rom/esp32/ld/esp32.rom.newlib-data.ld
 simple.elf: /home/gyula/esp/esp-idf/components/esp_rom/esp32/ld/esp32.rom.syscalls.ld
+simple.elf: /home/gyula/esp/esp-idf/components/esp_rom/esp32/ld/esp32.rom.newlib-funcs.ld
 simple.elf: esp-idf/esp32/esp32_out.ld
 simple.elf: esp-idf/esp32/ld/esp32.project.ld
 simple.elf: /home/gyula/esp/esp-idf/components/esp32/ld/esp32.peripherals.ld

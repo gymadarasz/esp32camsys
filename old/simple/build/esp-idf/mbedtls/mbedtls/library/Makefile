@@ -243,6 +243,33 @@ __/__/port/esp32/aes.c.s:
 	cd /home/gyula/Desktop/esp32camsys/old/simple/build && $(MAKE) -f esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/build.make esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/aes.c.s
 .PHONY : __/__/port/esp32/aes.c.s
 
+__/__/port/esp32/bignum.obj: __/__/port/esp32/bignum.c.obj
+
+.PHONY : __/__/port/esp32/bignum.obj
+
+# target to build an object file
+__/__/port/esp32/bignum.c.obj:
+	cd /home/gyula/Desktop/esp32camsys/old/simple/build && $(MAKE) -f esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/build.make esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/bignum.c.obj
+.PHONY : __/__/port/esp32/bignum.c.obj
+
+__/__/port/esp32/bignum.i: __/__/port/esp32/bignum.c.i
+
+.PHONY : __/__/port/esp32/bignum.i
+
+# target to preprocess a source file
+__/__/port/esp32/bignum.c.i:
+	cd /home/gyula/Desktop/esp32camsys/old/simple/build && $(MAKE) -f esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/build.make esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/bignum.c.i
+.PHONY : __/__/port/esp32/bignum.c.i
+
+__/__/port/esp32/bignum.s: __/__/port/esp32/bignum.c.s
+
+.PHONY : __/__/port/esp32/bignum.s
+
+# target to generate assembly for a file
+__/__/port/esp32/bignum.c.s:
+	cd /home/gyula/Desktop/esp32camsys/old/simple/build && $(MAKE) -f esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/build.make esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/bignum.c.s
+.PHONY : __/__/port/esp32/bignum.c.s
+
 __/__/port/esp32/esp_sha1.obj: __/__/port/esp32/esp_sha1.c.obj
 
 .PHONY : __/__/port/esp32/esp_sha1.obj
@@ -377,6 +404,33 @@ __/__/port/esp_aes_xts.s: __/__/port/esp_aes_xts.c.s
 __/__/port/esp_aes_xts.c.s:
 	cd /home/gyula/Desktop/esp32camsys/old/simple/build && $(MAKE) -f esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/build.make esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp_aes_xts.c.s
 .PHONY : __/__/port/esp_aes_xts.c.s
+
+__/__/port/esp_bignum.obj: __/__/port/esp_bignum.c.obj
+
+.PHONY : __/__/port/esp_bignum.obj
+
+# target to build an object file
+__/__/port/esp_bignum.c.obj:
+	cd /home/gyula/Desktop/esp32camsys/old/simple/build && $(MAKE) -f esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/build.make esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp_bignum.c.obj
+.PHONY : __/__/port/esp_bignum.c.obj
+
+__/__/port/esp_bignum.i: __/__/port/esp_bignum.c.i
+
+.PHONY : __/__/port/esp_bignum.i
+
+# target to preprocess a source file
+__/__/port/esp_bignum.c.i:
+	cd /home/gyula/Desktop/esp32camsys/old/simple/build && $(MAKE) -f esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/build.make esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp_bignum.c.i
+.PHONY : __/__/port/esp_bignum.c.i
+
+__/__/port/esp_bignum.s: __/__/port/esp_bignum.c.s
+
+.PHONY : __/__/port/esp_bignum.s
+
+# target to generate assembly for a file
+__/__/port/esp_bignum.c.s:
+	cd /home/gyula/Desktop/esp32camsys/old/simple/build && $(MAKE) -f esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/build.make esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp_bignum.c.s
+.PHONY : __/__/port/esp_bignum.c.s
 
 __/__/port/esp_hardware.obj: __/__/port/esp_hardware.c.obj
 
@@ -2665,6 +2719,9 @@ help:
 	@echo "... __/__/port/esp32/aes.obj"
 	@echo "... __/__/port/esp32/aes.i"
 	@echo "... __/__/port/esp32/aes.s"
+	@echo "... __/__/port/esp32/bignum.obj"
+	@echo "... __/__/port/esp32/bignum.i"
+	@echo "... __/__/port/esp32/bignum.s"
 	@echo "... __/__/port/esp32/esp_sha1.obj"
 	@echo "... __/__/port/esp32/esp_sha1.i"
 	@echo "... __/__/port/esp32/esp_sha1.s"
@@ -2680,6 +2737,9 @@ help:
 	@echo "... __/__/port/esp_aes_xts.obj"
 	@echo "... __/__/port/esp_aes_xts.i"
 	@echo "... __/__/port/esp_aes_xts.s"
+	@echo "... __/__/port/esp_bignum.obj"
+	@echo "... __/__/port/esp_bignum.i"
+	@echo "... __/__/port/esp_bignum.s"
 	@echo "... __/__/port/esp_hardware.obj"
 	@echo "... __/__/port/esp_hardware.i"
 	@echo "... __/__/port/esp_hardware.s"

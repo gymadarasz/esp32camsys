@@ -198,33 +198,6 @@ src/esp_eth.c.s:
 	cd /home/gyula/Desktop/esp32camsys/old/simple/build && $(MAKE) -f esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/build.make esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth.c.s
 .PHONY : src/esp_eth.c.s
 
-src/esp_eth_mac_dm9051.obj: src/esp_eth_mac_dm9051.c.obj
-
-.PHONY : src/esp_eth_mac_dm9051.obj
-
-# target to build an object file
-src/esp_eth_mac_dm9051.c.obj:
-	cd /home/gyula/Desktop/esp32camsys/old/simple/build && $(MAKE) -f esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/build.make esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_mac_dm9051.c.obj
-.PHONY : src/esp_eth_mac_dm9051.c.obj
-
-src/esp_eth_mac_dm9051.i: src/esp_eth_mac_dm9051.c.i
-
-.PHONY : src/esp_eth_mac_dm9051.i
-
-# target to preprocess a source file
-src/esp_eth_mac_dm9051.c.i:
-	cd /home/gyula/Desktop/esp32camsys/old/simple/build && $(MAKE) -f esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/build.make esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_mac_dm9051.c.i
-.PHONY : src/esp_eth_mac_dm9051.c.i
-
-src/esp_eth_mac_dm9051.s: src/esp_eth_mac_dm9051.c.s
-
-.PHONY : src/esp_eth_mac_dm9051.s
-
-# target to generate assembly for a file
-src/esp_eth_mac_dm9051.c.s:
-	cd /home/gyula/Desktop/esp32camsys/old/simple/build && $(MAKE) -f esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/build.make esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_mac_dm9051.c.s
-.PHONY : src/esp_eth_mac_dm9051.c.s
-
 src/esp_eth_mac_esp32.obj: src/esp_eth_mac_esp32.c.obj
 
 .PHONY : src/esp_eth_mac_esp32.obj
@@ -305,33 +278,6 @@ src/esp_eth_phy.s: src/esp_eth_phy.c.s
 src/esp_eth_phy.c.s:
 	cd /home/gyula/Desktop/esp32camsys/old/simple/build && $(MAKE) -f esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/build.make esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy.c.s
 .PHONY : src/esp_eth_phy.c.s
-
-src/esp_eth_phy_dm9051.obj: src/esp_eth_phy_dm9051.c.obj
-
-.PHONY : src/esp_eth_phy_dm9051.obj
-
-# target to build an object file
-src/esp_eth_phy_dm9051.c.obj:
-	cd /home/gyula/Desktop/esp32camsys/old/simple/build && $(MAKE) -f esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/build.make esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_dm9051.c.obj
-.PHONY : src/esp_eth_phy_dm9051.c.obj
-
-src/esp_eth_phy_dm9051.i: src/esp_eth_phy_dm9051.c.i
-
-.PHONY : src/esp_eth_phy_dm9051.i
-
-# target to preprocess a source file
-src/esp_eth_phy_dm9051.c.i:
-	cd /home/gyula/Desktop/esp32camsys/old/simple/build && $(MAKE) -f esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/build.make esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_dm9051.c.i
-.PHONY : src/esp_eth_phy_dm9051.c.i
-
-src/esp_eth_phy_dm9051.s: src/esp_eth_phy_dm9051.c.s
-
-.PHONY : src/esp_eth_phy_dm9051.s
-
-# target to generate assembly for a file
-src/esp_eth_phy_dm9051.c.s:
-	cd /home/gyula/Desktop/esp32camsys/old/simple/build && $(MAKE) -f esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/build.make esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_dm9051.c.s
-.PHONY : src/esp_eth_phy_dm9051.c.s
 
 src/esp_eth_phy_dp83848.obj: src/esp_eth_phy_dp83848.c.obj
 
@@ -457,9 +403,6 @@ help:
 	@echo "... src/esp_eth.obj"
 	@echo "... src/esp_eth.i"
 	@echo "... src/esp_eth.s"
-	@echo "... src/esp_eth_mac_dm9051.obj"
-	@echo "... src/esp_eth_mac_dm9051.i"
-	@echo "... src/esp_eth_mac_dm9051.s"
 	@echo "... src/esp_eth_mac_esp32.obj"
 	@echo "... src/esp_eth_mac_esp32.i"
 	@echo "... src/esp_eth_mac_esp32.s"
@@ -469,9 +412,6 @@ help:
 	@echo "... src/esp_eth_phy.obj"
 	@echo "... src/esp_eth_phy.i"
 	@echo "... src/esp_eth_phy.s"
-	@echo "... src/esp_eth_phy_dm9051.obj"
-	@echo "... src/esp_eth_phy_dm9051.i"
-	@echo "... src/esp_eth_phy_dm9051.s"
 	@echo "... src/esp_eth_phy_dp83848.obj"
 	@echo "... src/esp_eth_phy_dp83848.i"
 	@echo "... src/esp_eth_phy_dp83848.s"

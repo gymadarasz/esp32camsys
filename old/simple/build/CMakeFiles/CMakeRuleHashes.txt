@@ -29,7 +29,7 @@ d552e4a6a45859e137732e35e5e1873f esp-idf/efuse/CMakeFiles/efuse_test_table
 eafabee5bc8d63bb7b06841047a65924 esp-idf/esp32/CMakeFiles/__ldgen_output_esp32.project.ld
 eafabee5bc8d63bb7b06841047a65924 esp-idf/esp32/CMakeFiles/esp32_linker_script
 88f59d68da9427b56fff8c79a3fac4e2 esp-idf/esp32/esp32_out.ld
-23c973893308538bd030b158b2a9b753 esp-idf/esp32/ld/esp32.project.ld
+60f7fad674b499af1fdc3cd758b66a26 esp-idf/esp32/ld/esp32.project.ld
 4ae97b05e8f394d975b8b742f0730a37 esp-idf/esptool_py/CMakeFiles/app-flash
 65da87a944c2f3f3b20254ac21dedab1 esp-idf/esptool_py/CMakeFiles/encrypted-app-flash
 6bbb2b2ec9501b9165e1ab5c1ce5227f esp-idf/mbedtls/mbedtls/CMakeFiles/apidoc

@@ -1,15 +1,15 @@
 # The set of languages for which implicit dependencies are needed:
 set(CMAKE_DEPENDS_LANGUAGES
-  "CXX"
+  "C"
   )
 # The set of files for implicit dependencies of each language:
-set(CMAKE_DEPENDS_CHECK_CXX
-  "/home/gyula/Desktop/esp32camsys/camsys-client/main/main.cpp" "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/main/CMakeFiles/__idf_main.dir/main.cpp.obj"
+set(CMAKE_DEPENDS_CHECK_C
+  "/home/gyula/Desktop/esp32camsys/camsys-client/main/main.c" "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj"
   )
-set(CMAKE_CXX_COMPILER_ID "GNU")
+set(CMAKE_C_COMPILER_ID "GNU")
 
 # Preprocessor definitions for this target.
-set(CMAKE_TARGET_DEFINITIONS_CXX
+set(CMAKE_TARGET_DEFINITIONS_C
   "HAVE_CONFIG_H"
   "MBEDTLS_CONFIG_FILE=\"mbedtls/esp_config.h\""
   "UNITY_INCLUDE_CONFIG_H"
@@ -17,18 +17,17 @@ set(CMAKE_TARGET_DEFINITIONS_CXX
   )
 
 # The include file search paths:
-set(CMAKE_CXX_TARGET_INCLUDE_PATH
+set(CMAKE_C_TARGET_INCLUDE_PATH
   "config"
   "../main"
-  "../main/lib/esp32-camera"
-  "../main/lib/esp32-camera/conversions"
-  "../main/lib/esp32-camera/conversions/include"
-  "../main/lib/esp32-camera/conversions/private_include"
   "../main/lib/esp32-camera/driver"
-  "../main/lib/esp32-camera/driver/include"
-  "../main/lib/esp32-camera/driver/private_include"
   "../main/lib/esp32-camera/sensors"
+  "../main/lib/esp32-camera/conversions"
+  "../main/lib/esp32-camera/driver/include"
+  "../main/lib/esp32-camera/conversions/include"
+  "../main/lib/esp32-camera/driver/private_include"
   "../main/lib/esp32-camera/sensors/private_include"
+  "../main/lib/esp32-camera/conversions/private_include"
   "/home/gyula/esp/esp-idf/components/newlib/platform_include"
   "/home/gyula/esp/esp-idf/components/freertos/include"
   "/home/gyula/esp/esp-idf/components/freertos/xtensa/include"
@@ -126,6 +125,7 @@ set(CMAKE_CXX_TARGET_INCLUDE_PATH
   "/home/gyula/esp/esp-idf/components/unity/include"
   "/home/gyula/esp/esp-idf/components/unity/unity/src"
   "/home/gyula/esp/esp-idf/components/wifi_provisioning/include"
+  "/home/gyula/esp/esp-idf/examples/common_components/protocol_examples_common/include"
   )
 
 # Targets to which this target links.
@@ -196,6 +196,7 @@ set(CMAKE_TARGET_LINKED_INFO_FILES
   "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/ulp/CMakeFiles/__idf_ulp.dir/DependInfo.cmake"
   "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/unity/CMakeFiles/__idf_unity.dir/DependInfo.cmake"
   "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/wifi_provisioning/CMakeFiles/__idf_wifi_provisioning.dir/DependInfo.cmake"
+  "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/protocol_examples_common/CMakeFiles/__idf_protocol_examples_common.dir/DependInfo.cmake"
   "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/soc/soc/esp32/CMakeFiles/soc_esp32.dir/DependInfo.cmake"
   "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedtls.dir/DependInfo.cmake"
   "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/DependInfo.cmake"

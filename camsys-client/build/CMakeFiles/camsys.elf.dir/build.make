@@ -149,6 +149,7 @@ camsys.elf: esp-idf/spiffs/libspiffs.a
 camsys.elf: esp-idf/ulp/libulp.a
 camsys.elf: esp-idf/unity/libunity.a
 camsys.elf: esp-idf/wifi_provisioning/libwifi_provisioning.a
+camsys.elf: esp-idf/protocol_examples_common/libprotocol_examples_common.a
 camsys.elf: esp-idf/main/libmain.a
 camsys.elf: esp-idf/asio/libasio.a
 camsys.elf: esp-idf/cbor/libcbor.a
@@ -177,6 +178,7 @@ camsys.elf: esp-idf/protobuf-c/libprotobuf-c.a
 camsys.elf: esp-idf/mdns/libmdns.a
 camsys.elf: esp-idf/console/libconsole.a
 camsys.elf: esp-idf/json/libjson.a
+camsys.elf: esp-idf/protocol_examples_common/libprotocol_examples_common.a
 camsys.elf: esp-idf/xtensa/libxtensa.a
 camsys.elf: esp-idf/mbedtls/libmbedtls.a
 camsys.elf: esp-idf/efuse/libefuse.a

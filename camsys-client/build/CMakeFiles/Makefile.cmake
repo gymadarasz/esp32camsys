@@ -163,6 +163,7 @@ set(CMAKE_MAKEFILE_DEPENDS
   "/home/gyula/esp/esp-idf/components/wpa_supplicant/CMakeLists.txt"
   "/home/gyula/esp/esp-idf/components/xtensa/CMakeLists.txt"
   "/home/gyula/esp/esp-idf/examples/build_system/cmake/import_lib/main/lib/tinyxml2/.git"
+  "/home/gyula/esp/esp-idf/examples/common_components/protocol_examples_common/CMakeLists.txt"
   "/home/gyula/esp/esp-idf/examples/peripherals/secure_element/atecc608_ecdsa/components/esp-cryptoauthlib/.git"
   "/home/gyula/esp/esp-idf/tools/cmake/build.cmake"
   "/home/gyula/esp/esp-idf/tools/cmake/component.cmake"
@@ -312,6 +313,7 @@ set(CMAKE_MAKEFILE_PRODUCTS
   "esp-idf/ulp/CMakeFiles/CMakeDirectoryInformation.cmake"
   "esp-idf/unity/CMakeFiles/CMakeDirectoryInformation.cmake"
   "esp-idf/wifi_provisioning/CMakeFiles/CMakeDirectoryInformation.cmake"
+  "esp-idf/protocol_examples_common/CMakeFiles/CMakeDirectoryInformation.cmake"
   "esp-idf/main/CMakeFiles/CMakeDirectoryInformation.cmake"
   )
 
@@ -418,5 +420,6 @@ set(CMAKE_DEPEND_INFO_FILES
   "esp-idf/ulp/CMakeFiles/__idf_ulp.dir/DependInfo.cmake"
   "esp-idf/unity/CMakeFiles/__idf_unity.dir/DependInfo.cmake"
   "esp-idf/wifi_provisioning/CMakeFiles/__idf_wifi_provisioning.dir/DependInfo.cmake"
+  "esp-idf/protocol_examples_common/CMakeFiles/__idf_protocol_examples_common.dir/DependInfo.cmake"
   "esp-idf/main/CMakeFiles/__idf_main.dir/DependInfo.cmake"
   )

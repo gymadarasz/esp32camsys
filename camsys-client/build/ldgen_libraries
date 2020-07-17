@@ -64,4 +64,5 @@
 /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/ulp/libulp.a
 /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/unity/libunity.a
 /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/wifi_provisioning/libwifi_provisioning.a
+/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/protocol_examples_common/libprotocol_examples_common.a
 /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/main/libmain.a

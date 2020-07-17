@@ -107,6 +107,7 @@ if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   include("/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/ulp/cmake_install.cmake")
   include("/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/unity/cmake_install.cmake")
   include("/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/wifi_provisioning/cmake_install.cmake")
+  include("/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/protocol_examples_common/cmake_install.cmake")
   include("/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/main/cmake_install.cmake")
 
 endif()

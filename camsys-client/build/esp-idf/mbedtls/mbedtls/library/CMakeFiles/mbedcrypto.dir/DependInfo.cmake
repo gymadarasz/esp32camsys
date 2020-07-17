@@ -5,13 +5,11 @@ set(CMAKE_DEPENDS_LANGUAGES
 # The set of files for implicit dependencies of each language:
 set(CMAKE_DEPENDS_CHECK_C
   "/home/gyula/esp/esp-idf/components/mbedtls/port/esp32/aes.c" "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/aes.c.obj"
-  "/home/gyula/esp/esp-idf/components/mbedtls/port/esp32/bignum.c" "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/bignum.c.obj"
   "/home/gyula/esp/esp-idf/components/mbedtls/port/esp32/esp_sha1.c" "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha1.c.obj"
   "/home/gyula/esp/esp-idf/components/mbedtls/port/esp32/esp_sha256.c" "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha256.c.obj"
   "/home/gyula/esp/esp-idf/components/mbedtls/port/esp32/esp_sha512.c" "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha512.c.obj"
   "/home/gyula/esp/esp-idf/components/mbedtls/port/esp32/sha.c" "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/sha.c.obj"
   "/home/gyula/esp/esp-idf/components/mbedtls/port/esp_aes_xts.c" "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp_aes_xts.c.obj"
-  "/home/gyula/esp/esp-idf/components/mbedtls/port/esp_bignum.c" "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp_bignum.c.obj"
   "/home/gyula/esp/esp-idf/components/mbedtls/port/esp_hardware.c" "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp_hardware.c.obj"
   "/home/gyula/esp/esp-idf/components/mbedtls/port/esp_mem.c" "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp_mem.c.obj"
   "/home/gyula/esp/esp-idf/components/mbedtls/port/esp_sha.c" "/home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp_sha.c.obj"

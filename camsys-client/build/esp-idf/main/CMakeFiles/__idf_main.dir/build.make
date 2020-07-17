@@ -57,27 +57,27 @@ include esp-idf/main/CMakeFiles/__idf_main.dir/progress.make
 # Include the compile flags for this target's objects.
 include esp-idf/main/CMakeFiles/__idf_main.dir/flags.make
 
-esp-idf/main/CMakeFiles/__idf_main.dir/main.cpp.obj: esp-idf/main/CMakeFiles/__idf_main.dir/flags.make
-esp-idf/main/CMakeFiles/__idf_main.dir/main.cpp.obj: ../main/main.cpp
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/gyula/Desktop/esp32camsys/camsys-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/main.cpp.obj"
-	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/main && /home/gyula/.espressif/tools/xtensa-esp32-elf/esp-2020r2-8.2.0/xtensa-esp32-elf/bin/xtensa-esp32-elf-g++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/__idf_main.dir/main.cpp.obj -c /home/gyula/Desktop/esp32camsys/camsys-client/main/main.cpp
+esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: esp-idf/main/CMakeFiles/__idf_main.dir/flags.make
+esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: ../main/main.c
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/gyula/Desktop/esp32camsys/camsys-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building C object esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj"
+	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/main && /home/gyula/.espressif/tools/xtensa-esp32-elf/esp-2020r2-8.2.0/xtensa-esp32-elf/bin/xtensa-esp32-elf-gcc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/__idf_main.dir/main.c.obj   -c /home/gyula/Desktop/esp32camsys/camsys-client/main/main.c
 
-esp-idf/main/CMakeFiles/__idf_main.dir/main.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/__idf_main.dir/main.cpp.i"
-	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/main && /home/gyula/.espressif/tools/xtensa-esp32-elf/esp-2020r2-8.2.0/xtensa-esp32-elf/bin/xtensa-esp32-elf-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/gyula/Desktop/esp32camsys/camsys-client/main/main.cpp > CMakeFiles/__idf_main.dir/main.cpp.i
+esp-idf/main/CMakeFiles/__idf_main.dir/main.c.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/__idf_main.dir/main.c.i"
+	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/main && /home/gyula/.espressif/tools/xtensa-esp32-elf/esp-2020r2-8.2.0/xtensa-esp32-elf/bin/xtensa-esp32-elf-gcc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/gyula/Desktop/esp32camsys/camsys-client/main/main.c > CMakeFiles/__idf_main.dir/main.c.i
 
-esp-idf/main/CMakeFiles/__idf_main.dir/main.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/__idf_main.dir/main.cpp.s"
-	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/main && /home/gyula/.espressif/tools/xtensa-esp32-elf/esp-2020r2-8.2.0/xtensa-esp32-elf/bin/xtensa-esp32-elf-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/gyula/Desktop/esp32camsys/camsys-client/main/main.cpp -o CMakeFiles/__idf_main.dir/main.cpp.s
+esp-idf/main/CMakeFiles/__idf_main.dir/main.c.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/__idf_main.dir/main.c.s"
+	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/main && /home/gyula/.espressif/tools/xtensa-esp32-elf/esp-2020r2-8.2.0/xtensa-esp32-elf/bin/xtensa-esp32-elf-gcc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/gyula/Desktop/esp32camsys/camsys-client/main/main.c -o CMakeFiles/__idf_main.dir/main.c.s
 
 # Object files for target __idf_main
 __idf_main_OBJECTS = \
-"CMakeFiles/__idf_main.dir/main.cpp.obj"
+"CMakeFiles/__idf_main.dir/main.c.obj"
 
 # External object files for target __idf_main
 __idf_main_EXTERNAL_OBJECTS =
 
-esp-idf/main/libmain.a: esp-idf/main/CMakeFiles/__idf_main.dir/main.cpp.obj
+esp-idf/main/libmain.a: esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj
 esp-idf/main/libmain.a: esp-idf/main/CMakeFiles/__idf_main.dir/build.make
 esp-idf/main/libmain.a: esp-idf/main/CMakeFiles/__idf_main.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/gyula/Desktop/esp32camsys/camsys-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX static library libmain.a"

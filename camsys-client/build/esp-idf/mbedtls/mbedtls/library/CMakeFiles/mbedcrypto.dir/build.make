@@ -941,35 +941,9 @@ esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/sha.c
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/mbedcrypto.dir/__/__/port/esp32/sha.c.s"
 	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library && /home/gyula/.espressif/tools/xtensa-esp32-elf/esp-2020r2-8.2.0/xtensa-esp32-elf/bin/xtensa-esp32-elf-gcc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/gyula/esp/esp-idf/components/mbedtls/port/esp32/sha.c -o CMakeFiles/mbedcrypto.dir/__/__/port/esp32/sha.c.s
 
-esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp_bignum.c.obj: esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/flags.make
-esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp_bignum.c.obj: /home/gyula/esp/esp-idf/components/mbedtls/port/esp_bignum.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/gyula/Desktop/esp32camsys/camsys-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_69) "Building C object esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp_bignum.c.obj"
-	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library && /home/gyula/.espressif/tools/xtensa-esp32-elf/esp-2020r2-8.2.0/xtensa-esp32-elf/bin/xtensa-esp32-elf-gcc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/mbedcrypto.dir/__/__/port/esp_bignum.c.obj   -c /home/gyula/esp/esp-idf/components/mbedtls/port/esp_bignum.c
-
-esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp_bignum.c.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/mbedcrypto.dir/__/__/port/esp_bignum.c.i"
-	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library && /home/gyula/.espressif/tools/xtensa-esp32-elf/esp-2020r2-8.2.0/xtensa-esp32-elf/bin/xtensa-esp32-elf-gcc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/gyula/esp/esp-idf/components/mbedtls/port/esp_bignum.c > CMakeFiles/mbedcrypto.dir/__/__/port/esp_bignum.c.i
-
-esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp_bignum.c.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/mbedcrypto.dir/__/__/port/esp_bignum.c.s"
-	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library && /home/gyula/.espressif/tools/xtensa-esp32-elf/esp-2020r2-8.2.0/xtensa-esp32-elf/bin/xtensa-esp32-elf-gcc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/gyula/esp/esp-idf/components/mbedtls/port/esp_bignum.c -o CMakeFiles/mbedcrypto.dir/__/__/port/esp_bignum.c.s
-
-esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/bignum.c.obj: esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/flags.make
-esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/bignum.c.obj: /home/gyula/esp/esp-idf/components/mbedtls/port/esp32/bignum.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/gyula/Desktop/esp32camsys/camsys-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_70) "Building C object esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/bignum.c.obj"
-	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library && /home/gyula/.espressif/tools/xtensa-esp32-elf/esp-2020r2-8.2.0/xtensa-esp32-elf/bin/xtensa-esp32-elf-gcc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/mbedcrypto.dir/__/__/port/esp32/bignum.c.obj   -c /home/gyula/esp/esp-idf/components/mbedtls/port/esp32/bignum.c
-
-esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/bignum.c.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/mbedcrypto.dir/__/__/port/esp32/bignum.c.i"
-	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library && /home/gyula/.espressif/tools/xtensa-esp32-elf/esp-2020r2-8.2.0/xtensa-esp32-elf/bin/xtensa-esp32-elf-gcc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/gyula/esp/esp-idf/components/mbedtls/port/esp32/bignum.c > CMakeFiles/mbedcrypto.dir/__/__/port/esp32/bignum.c.i
-
-esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/bignum.c.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/mbedcrypto.dir/__/__/port/esp32/bignum.c.s"
-	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library && /home/gyula/.espressif/tools/xtensa-esp32-elf/esp-2020r2-8.2.0/xtensa-esp32-elf/bin/xtensa-esp32-elf-gcc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/gyula/esp/esp-idf/components/mbedtls/port/esp32/bignum.c -o CMakeFiles/mbedcrypto.dir/__/__/port/esp32/bignum.c.s
-
 esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha1.c.obj: esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/flags.make
 esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha1.c.obj: /home/gyula/esp/esp-idf/components/mbedtls/port/esp32/esp_sha1.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/gyula/Desktop/esp32camsys/camsys-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_71) "Building C object esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha1.c.obj"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/gyula/Desktop/esp32camsys/camsys-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_69) "Building C object esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha1.c.obj"
 	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library && /home/gyula/.espressif/tools/xtensa-esp32-elf/esp-2020r2-8.2.0/xtensa-esp32-elf/bin/xtensa-esp32-elf-gcc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha1.c.obj   -c /home/gyula/esp/esp-idf/components/mbedtls/port/esp32/esp_sha1.c
 
 esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha1.c.i: cmake_force
@@ -982,7 +956,7 @@ esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_s
 
 esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha256.c.obj: esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/flags.make
 esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha256.c.obj: /home/gyula/esp/esp-idf/components/mbedtls/port/esp32/esp_sha256.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/gyula/Desktop/esp32camsys/camsys-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_72) "Building C object esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha256.c.obj"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/gyula/Desktop/esp32camsys/camsys-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_70) "Building C object esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha256.c.obj"
 	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library && /home/gyula/.espressif/tools/xtensa-esp32-elf/esp-2020r2-8.2.0/xtensa-esp32-elf/bin/xtensa-esp32-elf-gcc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha256.c.obj   -c /home/gyula/esp/esp-idf/components/mbedtls/port/esp32/esp_sha256.c
 
 esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha256.c.i: cmake_force
@@ -995,7 +969,7 @@ esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_s
 
 esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha512.c.obj: esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/flags.make
 esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha512.c.obj: /home/gyula/esp/esp-idf/components/mbedtls/port/esp32/esp_sha512.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/gyula/Desktop/esp32camsys/camsys-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_73) "Building C object esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha512.c.obj"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/gyula/Desktop/esp32camsys/camsys-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_71) "Building C object esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha512.c.obj"
 	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library && /home/gyula/.espressif/tools/xtensa-esp32-elf/esp-2020r2-8.2.0/xtensa-esp32-elf/bin/xtensa-esp32-elf-gcc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha512.c.obj   -c /home/gyula/esp/esp-idf/components/mbedtls/port/esp32/esp_sha512.c
 
 esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha512.c.i: cmake_force
@@ -1076,8 +1050,6 @@ mbedcrypto_OBJECTS = \
 "CMakeFiles/mbedcrypto.dir/__/__/port/esp_aes_xts.c.obj" \
 "CMakeFiles/mbedcrypto.dir/__/__/port/esp32/aes.c.obj" \
 "CMakeFiles/mbedcrypto.dir/__/__/port/esp32/sha.c.obj" \
-"CMakeFiles/mbedcrypto.dir/__/__/port/esp_bignum.c.obj" \
-"CMakeFiles/mbedcrypto.dir/__/__/port/esp32/bignum.c.obj" \
 "CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha1.c.obj" \
 "CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha256.c.obj" \
 "CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha512.c.obj"
@@ -1153,14 +1125,12 @@ esp-idf/mbedtls/mbedtls/library/libmbedcrypto.a: esp-idf/mbedtls/mbedtls/library
 esp-idf/mbedtls/mbedtls/library/libmbedcrypto.a: esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp_aes_xts.c.obj
 esp-idf/mbedtls/mbedtls/library/libmbedcrypto.a: esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/aes.c.obj
 esp-idf/mbedtls/mbedtls/library/libmbedcrypto.a: esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/sha.c.obj
-esp-idf/mbedtls/mbedtls/library/libmbedcrypto.a: esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp_bignum.c.obj
-esp-idf/mbedtls/mbedtls/library/libmbedcrypto.a: esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/bignum.c.obj
 esp-idf/mbedtls/mbedtls/library/libmbedcrypto.a: esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha1.c.obj
 esp-idf/mbedtls/mbedtls/library/libmbedcrypto.a: esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha256.c.obj
 esp-idf/mbedtls/mbedtls/library/libmbedcrypto.a: esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/__/__/port/esp32/esp_sha512.c.obj
 esp-idf/mbedtls/mbedtls/library/libmbedcrypto.a: esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/build.make
 esp-idf/mbedtls/mbedtls/library/libmbedcrypto.a: esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/gyula/Desktop/esp32camsys/camsys-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_74) "Linking CXX static library libmbedcrypto.a"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/gyula/Desktop/esp32camsys/camsys-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_72) "Linking CXX static library libmbedcrypto.a"
 	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library && $(CMAKE_COMMAND) -P CMakeFiles/mbedcrypto.dir/cmake_clean_target.cmake
 	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/mbedtls/mbedtls/library && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/mbedcrypto.dir/link.txt --verbose=$(VERBOSE)
 

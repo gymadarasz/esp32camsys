@@ -161,6 +161,32 @@ esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_rtl8201.c.s: cmake_
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_rtl8201.c.s"
 	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/esp_eth && /home/gyula/.espressif/tools/xtensa-esp32-elf/esp-2020r2-8.2.0/xtensa-esp32-elf/bin/xtensa-esp32-elf-gcc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/gyula/esp/esp-idf/components/esp_eth/src/esp_eth_phy_rtl8201.c -o CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_rtl8201.c.s
 
+esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_mac_dm9051.c.obj: esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/flags.make
+esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_mac_dm9051.c.obj: /home/gyula/esp/esp-idf/components/esp_eth/src/esp_eth_mac_dm9051.c
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/gyula/Desktop/esp32camsys/camsys-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Building C object esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_mac_dm9051.c.obj"
+	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/esp_eth && /home/gyula/.espressif/tools/xtensa-esp32-elf/esp-2020r2-8.2.0/xtensa-esp32-elf/bin/xtensa-esp32-elf-gcc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/__idf_esp_eth.dir/src/esp_eth_mac_dm9051.c.obj   -c /home/gyula/esp/esp-idf/components/esp_eth/src/esp_eth_mac_dm9051.c
+
+esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_mac_dm9051.c.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/__idf_esp_eth.dir/src/esp_eth_mac_dm9051.c.i"
+	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/esp_eth && /home/gyula/.espressif/tools/xtensa-esp32-elf/esp-2020r2-8.2.0/xtensa-esp32-elf/bin/xtensa-esp32-elf-gcc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/gyula/esp/esp-idf/components/esp_eth/src/esp_eth_mac_dm9051.c > CMakeFiles/__idf_esp_eth.dir/src/esp_eth_mac_dm9051.c.i
+
+esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_mac_dm9051.c.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/__idf_esp_eth.dir/src/esp_eth_mac_dm9051.c.s"
+	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/esp_eth && /home/gyula/.espressif/tools/xtensa-esp32-elf/esp-2020r2-8.2.0/xtensa-esp32-elf/bin/xtensa-esp32-elf-gcc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/gyula/esp/esp-idf/components/esp_eth/src/esp_eth_mac_dm9051.c -o CMakeFiles/__idf_esp_eth.dir/src/esp_eth_mac_dm9051.c.s
+
+esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_dm9051.c.obj: esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/flags.make
+esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_dm9051.c.obj: /home/gyula/esp/esp-idf/components/esp_eth/src/esp_eth_phy_dm9051.c
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/gyula/Desktop/esp32camsys/camsys-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_10) "Building C object esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_dm9051.c.obj"
+	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/esp_eth && /home/gyula/.espressif/tools/xtensa-esp32-elf/esp-2020r2-8.2.0/xtensa-esp32-elf/bin/xtensa-esp32-elf-gcc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_dm9051.c.obj   -c /home/gyula/esp/esp-idf/components/esp_eth/src/esp_eth_phy_dm9051.c
+
+esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_dm9051.c.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_dm9051.c.i"
+	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/esp_eth && /home/gyula/.espressif/tools/xtensa-esp32-elf/esp-2020r2-8.2.0/xtensa-esp32-elf/bin/xtensa-esp32-elf-gcc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/gyula/esp/esp-idf/components/esp_eth/src/esp_eth_phy_dm9051.c > CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_dm9051.c.i
+
+esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_dm9051.c.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_dm9051.c.s"
+	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/esp_eth && /home/gyula/.espressif/tools/xtensa-esp32-elf/esp-2020r2-8.2.0/xtensa-esp32-elf/bin/xtensa-esp32-elf-gcc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/gyula/esp/esp-idf/components/esp_eth/src/esp_eth_phy_dm9051.c -o CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_dm9051.c.s
+
 # Object files for target __idf_esp_eth
 __idf_esp_eth_OBJECTS = \
 "CMakeFiles/__idf_esp_eth.dir/src/esp_eth.c.obj" \
@@ -170,7 +196,9 @@ __idf_esp_eth_OBJECTS = \
 "CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_dp83848.c.obj" \
 "CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_ip101.c.obj" \
 "CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_lan8720.c.obj" \
-"CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_rtl8201.c.obj"
+"CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_rtl8201.c.obj" \
+"CMakeFiles/__idf_esp_eth.dir/src/esp_eth_mac_dm9051.c.obj" \
+"CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_dm9051.c.obj"
 
 # External object files for target __idf_esp_eth
 __idf_esp_eth_EXTERNAL_OBJECTS =
@@ -183,9 +211,11 @@ esp-idf/esp_eth/libesp_eth.a: esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/e
 esp-idf/esp_eth/libesp_eth.a: esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_ip101.c.obj
 esp-idf/esp_eth/libesp_eth.a: esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_lan8720.c.obj
 esp-idf/esp_eth/libesp_eth.a: esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_rtl8201.c.obj
+esp-idf/esp_eth/libesp_eth.a: esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_mac_dm9051.c.obj
+esp-idf/esp_eth/libesp_eth.a: esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/src/esp_eth_phy_dm9051.c.obj
 esp-idf/esp_eth/libesp_eth.a: esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/build.make
 esp-idf/esp_eth/libesp_eth.a: esp-idf/esp_eth/CMakeFiles/__idf_esp_eth.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/gyula/Desktop/esp32camsys/camsys-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Linking CXX static library libesp_eth.a"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/gyula/Desktop/esp32camsys/camsys-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_11) "Linking CXX static library libesp_eth.a"
 	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/esp_eth && $(CMAKE_COMMAND) -P CMakeFiles/__idf_esp_eth.dir/cmake_clean_target.cmake
 	cd /home/gyula/Desktop/esp32camsys/camsys-client/build/esp-idf/esp_eth && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/__idf_esp_eth.dir/link.txt --verbose=$(VERBOSE)
 

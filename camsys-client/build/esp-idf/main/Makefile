@@ -171,32 +171,32 @@ __idf_main/fast:
 	cd /home/gyula/Desktop/esp32camsys/camsys-client/build && $(MAKE) -f esp-idf/main/CMakeFiles/__idf_main.dir/build.make esp-idf/main/CMakeFiles/__idf_main.dir/build
 .PHONY : __idf_main/fast
 
-main.obj: main.cpp.obj
+main.obj: main.c.obj
 
 .PHONY : main.obj
 
 # target to build an object file
-main.cpp.obj:
-	cd /home/gyula/Desktop/esp32camsys/camsys-client/build && $(MAKE) -f esp-idf/main/CMakeFiles/__idf_main.dir/build.make esp-idf/main/CMakeFiles/__idf_main.dir/main.cpp.obj
-.PHONY : main.cpp.obj
+main.c.obj:
+	cd /home/gyula/Desktop/esp32camsys/camsys-client/build && $(MAKE) -f esp-idf/main/CMakeFiles/__idf_main.dir/build.make esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj
+.PHONY : main.c.obj
 
-main.i: main.cpp.i
+main.i: main.c.i
 
 .PHONY : main.i
 
 # target to preprocess a source file
-main.cpp.i:
-	cd /home/gyula/Desktop/esp32camsys/camsys-client/build && $(MAKE) -f esp-idf/main/CMakeFiles/__idf_main.dir/build.make esp-idf/main/CMakeFiles/__idf_main.dir/main.cpp.i
-.PHONY : main.cpp.i
+main.c.i:
+	cd /home/gyula/Desktop/esp32camsys/camsys-client/build && $(MAKE) -f esp-idf/main/CMakeFiles/__idf_main.dir/build.make esp-idf/main/CMakeFiles/__idf_main.dir/main.c.i
+.PHONY : main.c.i
 
-main.s: main.cpp.s
+main.s: main.c.s
 
 .PHONY : main.s
 
 # target to generate assembly for a file
-main.cpp.s:
-	cd /home/gyula/Desktop/esp32camsys/camsys-client/build && $(MAKE) -f esp-idf/main/CMakeFiles/__idf_main.dir/build.make esp-idf/main/CMakeFiles/__idf_main.dir/main.cpp.s
-.PHONY : main.cpp.s
+main.c.s:
+	cd /home/gyula/Desktop/esp32camsys/camsys-client/build && $(MAKE) -f esp-idf/main/CMakeFiles/__idf_main.dir/build.make esp-idf/main/CMakeFiles/__idf_main.dir/main.c.s
+.PHONY : main.c.s
 
 # Help Target
 help:
