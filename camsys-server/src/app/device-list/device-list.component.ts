@@ -23,6 +23,7 @@ class CamDevice {
   diff: number;
   watcher: CamDeviceWatcher = new CamDeviceWatcher();
   userSet: CamUserSet = new CamUserSet();
+  streamUrl: string;
 }
 
 class CamDeviceList {
@@ -51,6 +52,7 @@ class CamDeviceList {
     foundDevice.updatedAt = StaticTime.getNow();
     foundDevice.type = type;
     foundDevice.base = base;
+    
     if (type === 'motion') {
       foundDevice.diff = diffSumMax;
       foundDevice.watcher = watcher;
@@ -129,7 +131,7 @@ export class DeviceListComponent implements OnInit {
   camDeviceList: CamDeviceList = new CamDeviceList();
 
   refreshTimer: IntervalTimer;
-  refreshImagesTimer: IntervalTimer;
+  // refreshImagesTimer: IntervalTimer;
 
   userInCamDeviceSetField = false;
 
@@ -146,32 +148,36 @@ export class DeviceListComponent implements OnInit {
       this.now = StaticTime.getNow();
       //console.log(this.camDeviceList.camDevices);
       this.camDeviceList.camDevices.forEach((camDevice) => {
-        camDevice.status = 'connected';
         //console.log(this.now, camDevice.updatedAt, this.now - camDevice.updatedAt);
         if (this.now - camDevice.updatedAt > 10000) {
           camDevice.status = 'disconnected';
+        } else {
+          if (camDevice.status != 'connected') {
+            camDevice.streamUrl = 'http://' + camDevice.base + '/stream?ts=' + StaticTime.getNow();
+          }
+          camDevice.status = 'connected';
         }
       });
     }, 100);
 
-    this.refreshImagesTimer = new IntervalTimer(() => {
-      this.camDeviceList.camDevices.forEach((camDevice, key) => {
-        if (camDevice.status == 'connected') {
-          //setTimeout(() => {
-            //CamDevice.refreshImage(camDevice);
-            var src = 'http://' + camDevice.base + '/image?ts=' + StaticTime.getNow();
-            var img = document.createElement('img');
-            img.src = src;
-            var _camDevice = camDevice;
-            img.onload = () => {
-              console.log('------------------------------------------------------------------------', _camDevice.id);
-              document.getElementById('camimg-'+_camDevice.id).setAttribute('src', src);
-            }
+    // this.refreshImagesTimer = new IntervalTimer(() => {
+    //   this.camDeviceList.camDevices.forEach((camDevice, key) => {
+    //     if (camDevice.status == 'connected') {
+    //       //setTimeout(() => {
+    //         //CamDevice.refreshImage(camDevice);
+    //         var src = 'http://' + camDevice.base + '/image?ts=' + StaticTime.getNow();
+    //         var img = document.createElement('img');
+    //         img.src = src;
+    //         var _camDevice = camDevice;
+    //         img.onload = () => {
+    //           console.log('------------------------------------------------------------------------', _camDevice.id);
+    //           document.getElementById('camimg-'+_camDevice.id).setAttribute('src', src);
+    //         }
             
-          //}, 100);
-        }
-      });
-    }, 100);
+    //       //}, 100);
+    //     }
+    //   });
+    // }, 100);
 
   }
 
@@ -180,7 +186,7 @@ export class DeviceListComponent implements OnInit {
 
   ngOnDestroy(): void {
     this.refreshTimer.kill();
-    this.refreshImagesTimer.kill();
+    // this.refreshImagesTimer.kill();
     this.saveDeviceList();
   }
 

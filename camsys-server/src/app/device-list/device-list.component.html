@@ -83,10 +83,18 @@
                 <br>
             </div>
 
+            <label>Stream:</label>
+            {{ camDevice.streamUrl }}
+            <br>
+            <img src="{{ camDevice.streamUrl }}">
+            <br>
+
+            <!--
             <label>Image:</label>
             <br>
             <img id="camimg-{{ camDevice.id }}">
             <br>
+            -->
 
         </ng-template>
 

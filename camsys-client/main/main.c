@@ -973,10 +973,75 @@ esp_err_t uri_motion_image_httpd_handler(httpd_req_t* req) {
     return res;
 }
 
+#define MOTION_PART_BOUNDARY "123456789000000000000987654321"
+static const char* MOTION__STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" MOTION_PART_BOUNDARY;
+static const char* MOTION__STREAM_BOUNDARY = "\r\n--" MOTION_PART_BOUNDARY "\r\n";
+static const char* MOTION__STREAM_PART = "Content-Type: image/x-windows-bmp\r\nContent-Length: %u\r\n\r\n";
+
+esp_err_t uri_motion_stream_httpd_handler(httpd_req_t* req) {
+    // camera_fb_t * fb = NULL;
+    esp_err_t res = ESP_OK;
+    size_t _bmp_buf_len;
+    uint8_t * _bmp_buf;
+    char * part_buf[64];
+
+    res = httpd_resp_set_type(req, MOTION__STREAM_CONTENT_TYPE);
+    if(res != ESP_OK){
+        return res;
+    }
+
+    while(true){
+        //fb = esp_camera_fb_get();
+        if (!fb) {
+            ESP_LOGE(TAG, "Camera capture failed");
+            res = ESP_FAIL;
+            break;
+        }
+        
+        bool bmp_converted = frame2bmp(fb, &_bmp_buf, &_bmp_buf_len);
+        if(!bmp_converted){
+            ESP_LOGE(TAG, "BMP compression failed");
+            esp_camera_fb_return(fb);
+            res = ESP_FAIL;
+        }
+                    
+
+        if(res == ESP_OK){
+            res = httpd_resp_send_chunk(req, MOTION__STREAM_BOUNDARY, strlen(MOTION__STREAM_BOUNDARY));
+        }
+        if(res == ESP_OK){
+            size_t hlen = snprintf((char *)part_buf, 64, MOTION__STREAM_PART, _bmp_buf_len);
+
+            res = httpd_resp_send_chunk(req, (const char *)part_buf, hlen);
+        }
+        if(res == ESP_OK){
+            res = httpd_resp_send_chunk(req, (const char *)_bmp_buf, _bmp_buf_len);
+        }
+        if(fb->format != PIXFORMAT_JPEG){
+            free(_bmp_buf);
+        }
+        esp_camera_fb_return(fb);
+        if(res != ESP_OK){
+            break;
+        }
+    }
+
+    return res;
+}
+
 static const httpd_uri_t uri_motion_image = {
     .uri       = "/image",
     .method    = HTTP_GET,
     .handler   = uri_motion_image_httpd_handler, // TODO: JPEG FASTER!! use/convert jpeg at motion monitor to mark fixed pixels on screen to get faster net speeed
+    /* Let's pass response string in user
+     * context to demonstrate it's usage */
+    .user_ctx  = NULL
+};
+
+static const httpd_uri_t uri_motion_stream = {
+    .uri       = "/stream",
+    .method    = HTTP_GET,
+    .handler   = uri_motion_stream_httpd_handler, // TODO: JPEG FASTER!! use/convert jpeg at motion monitor to mark fixed pixels on screen to get faster net speeed
     /* Let's pass response string in user
      * context to demonstrate it's usage */
     .user_ctx  = NULL
@@ -987,6 +1052,7 @@ static const httpd_uri_t uri_motion_image = {
 void motion_setup(httpd_handle_t httpd_server) {
     motion_init();
     ESP_ERROR_CHECK(httpd_register_uri_handler(httpd_server, &uri_motion_image));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(httpd_server, &uri_motion_stream));
 }
 
 void motion_loop(void * pvParameters) {
