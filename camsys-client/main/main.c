@@ -6,6 +6,7 @@
 #include "esp_event.h"
 #include "esp_tls.h"
 #include "esp_http_client.h"
+#include "esp_http_server.h"
 #include "driver/uart.h"
 #include "driver/gpio.h"
 #include "nvs_flash.h"
@@ -470,7 +471,7 @@ bool wifi_connect_attempt(char* wifi_settings, char* ssid) {
 bool wifi_scan_connect(char* wifi_settings)
 {
 
-    ESP_ERROR_CHECK(esp_netif_init());
+    //ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
     assert(sta_netif);
@@ -678,7 +679,7 @@ bool app_http_request_join(nvs_handle_t nvs_handle, const char* additional_join_
 
     const size_t ipbuff_size = 32;
     char ipbuff[ipbuff_size];
-    ip4addr_ntoa_r(&wifi_ip_addr, &ipbuff, ipbuff_size);
+    ip4addr_ntoa_r(&wifi_ip_addr, ipbuff, ipbuff_size);
 
     snprintf(url, strmax, "%s://%s:%d/join", http_prefix, host, http_port);
     snprintf(post_data, strmax, "client=%s&secret=%s&base=%s&%s", uids, secret, ipbuff, additional_join_post_data);
@@ -695,9 +696,10 @@ bool app_http_request_join(nvs_handle_t nvs_handle, const char* additional_join_
 }
 
 typedef void (*additional_join_post_data_cb_t)(char* buff, size_t size); 
-typedef void (*app_main_presetup_func_t)(void);
+typedef void (*app_main_presetup_func_t)(httpd_handle_t httpd_server);
 
 void app_main_start(
+    httpd_handle_t httpd_server,
     nvs_handle_t nvs_handle,
     int tickSpeed,
     additional_join_post_data_cb_t additional_join_post_data_cb, 
@@ -705,7 +707,7 @@ void app_main_start(
     app_main_presetup_func_t presetup,
     TaskFunction_t subtask
 ) {
-    presetup();
+    presetup(httpd_server);
 
     char* wifi_settings = app_wifi_start(nvs_handle);
     
@@ -730,6 +732,18 @@ void app_main_start(
     free(wifi_settings);
 }
 
+/****************** HTTPD SERVER *****************/
+
+httpd_handle_t httpd_server_init() {
+    httpd_handle_t server = NULL;
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+
+    // Start the httpd server
+    ESP_LOGI(TAG, "Starting server on port: '%d'", config.server_port);
+    ESP_ERROR_CHECK(httpd_start(&server, &config));
+    
+    return server;
+}
 
 /****************** MOTION MODE *****************/
 
@@ -919,9 +933,60 @@ void motion_join_response_handler(char* buff, size_t size) {
     if (motion_state.diff_sum_max <= motion_state_last.diff_sum_max) motion_state.diff_sum_max = 0;
 }
 
+// ----- httpd ------
 
-void motion_setup() {
+esp_err_t uri_motion_image_httpd_handler(httpd_req_t* req) {
+    PRINT("IMAGE REQUESTED...");
+    esp_err_t res = ESP_OK;
+	
+    //initialize the camera
+    if (!fb) {
+        fb = esp_camera_fb_get();
+    }
+    if (!fb) {
+        ESP_LOGE(TAG, "Camera capture failed");
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    //ESP_LOGI(TAG, "FRAME BUFFER: %u %u %u", fb->len, fb->width, fb->height);
+	
+    uint8_t * buf = NULL;
+    size_t buf_len = 0;
+    bool converted = frame2bmp(fb, &buf, &buf_len);
+    esp_camera_fb_return(fb);
+    if(!converted) {
+        ESP_LOGE(TAG, "BMP conversion failed");
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    // TODO: convert to jpeg to get faster net response
+    res = httpd_resp_set_type(req, "image/x-windows-bmp")
+       || httpd_resp_set_hdr(req, "Content-Disposition", "inline; filename=capture.bmp")
+       || httpd_resp_send(req, (const char *)buf, buf_len);
+    free(buf);
+    
+    //ESP_ERROR_CHECK_WITHOUT_ABORT(res);
+    PRINTF("CREATE IMAGE %s", res == ESP_OK ? "SUCCESS" : "FAIL");
+    if (res != ESP_OK) httpd_resp_send_500(req);
+    return res;
+}
+
+static const httpd_uri_t uri_motion_image = {
+    .uri       = "/image",
+    .method    = HTTP_GET,
+    .handler   = uri_motion_image_httpd_handler, // TODO: JPEG FASTER!! use/convert jpeg at motion monitor to mark fixed pixels on screen to get faster net speeed
+    /* Let's pass response string in user
+     * context to demonstrate it's usage */
+    .user_ctx  = NULL
+};
+
+
+
+void motion_setup(httpd_handle_t httpd_server) {
     motion_init();
+    ESP_ERROR_CHECK(httpd_register_uri_handler(httpd_server, &uri_motion_image));
 }
 
 void motion_loop(void * pvParameters) {
@@ -983,17 +1048,25 @@ void app_main()
     nvs_init(&nvs_handle);
     gpio_pins_init();
 
+    ESP_ERROR_CHECK( esp_netif_init() );
+
+    httpd_handle_t httpd_server = httpd_server_init();
+
     int motion_button_state = !gpio_get_level(GPIO_NUM_12);
     int camera_button_state = !gpio_get_level(GPIO_NUM_13);
 
     if (motion_button_state) 
-        app_main_start(nvs_handle, 500, motion_additional_join_post_data, motion_join_response_handler, motion_setup, motion_loop); //wifi_websocket_client_app_start(motion_sensor_setup, motion_sensor_loop, motion_sensor_data, motion_sensor_connected, motion_sensor_disconnected, motion_sensor_error);
+        app_main_start(
+            httpd_server, nvs_handle, 500, motion_additional_join_post_data, 
+            motion_join_response_handler, motion_setup, motion_loop
+        ); //wifi_websocket_client_app_start(motion_sensor_setup, motion_sensor_loop, motion_sensor_data, motion_sensor_connected, motion_sensor_disconnected, motion_sensor_error);
     else if (camera_button_state) 
         printf("CAMERA MODE...\n"); //wifi_websocket_client_app_start(camera_recorder_setup, camera_recorder_loop, camera_recorder_data, camera_recorder_connected, camera_recorder_disconnected, camera_recorder_error);
     else 
         app_main_settings(nvs_handle);
 
     nvs_close(nvs_handle);
+    ESP_ERROR_CHECK( esp_netif_deinit() );
     stop("LEAVING");
 }
 

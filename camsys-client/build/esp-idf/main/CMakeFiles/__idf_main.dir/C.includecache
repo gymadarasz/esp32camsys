@@ -321,6 +321,8 @@ esp_tls.h
 /home/gyula/Desktop/esp32camsys/camsys-client/main/esp_tls.h
 esp_http_client.h
 /home/gyula/Desktop/esp32camsys/camsys-client/main/esp_http_client.h
+esp_http_server.h
+/home/gyula/Desktop/esp32camsys/camsys-client/main/esp_http_server.h
 driver/uart.h
 /home/gyula/Desktop/esp32camsys/camsys-client/main/driver/uart.h
 driver/gpio.h
@@ -855,6 +857,22 @@ sdkconfig.h
 /home/gyula/esp/esp-idf/components/esp_http_client/include/sdkconfig.h
 esp_err.h
 /home/gyula/esp/esp-idf/components/esp_http_client/include/esp_err.h
+
+/home/gyula/esp/esp-idf/components/esp_http_server/include/esp_http_server.h
+stdio.h
+-
+string.h
+-
+freertos/FreeRTOS.h
+-
+freertos/task.h
+-
+http_parser.h
+-
+sdkconfig.h
+-
+esp_err.h
+-
 
 /home/gyula/esp/esp-idf/components/esp_netif/include/esp_netif.h
 stdint.h

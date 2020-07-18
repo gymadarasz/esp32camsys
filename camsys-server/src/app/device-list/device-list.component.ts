@@ -111,6 +111,10 @@ class IntervalTimer {
     this.state = 1;
   }
 
+  kill() {
+    window.clearInterval(this.timerId);
+  }
+
 }
 
 
@@ -125,10 +129,12 @@ export class DeviceListComponent implements OnInit {
   camDeviceList: CamDeviceList = new CamDeviceList();
 
   refreshTimer: IntervalTimer;
+  refreshImagesTimer: IntervalTimer;
 
   userInCamDeviceSetField = false;
 
   now: number;
+
 
   constructor(private httpServerAppFactory: HttpServerAppFactoryService) {
 
@@ -138,25 +144,48 @@ export class DeviceListComponent implements OnInit {
 
     this.refreshTimer = new IntervalTimer(() => {
       this.now = StaticTime.getNow();
+      //console.log(this.camDeviceList.camDevices);
       this.camDeviceList.camDevices.forEach((camDevice) => {
         camDevice.status = 'connected';
-        console.log(this.now, camDevice.updatedAt, this.now - camDevice.updatedAt);
+        //console.log(this.now, camDevice.updatedAt, this.now - camDevice.updatedAt);
         if (this.now - camDevice.updatedAt > 10000) {
-          camDevice.status = '...';
+          camDevice.status = 'disconnected';
         }
       });
-    }, 500);
+    }, 100);
+
+    this.refreshImagesTimer = new IntervalTimer(() => {
+      this.camDeviceList.camDevices.forEach((camDevice, key) => {
+        if (camDevice.status == 'connected') {
+          //setTimeout(() => {
+            //CamDevice.refreshImage(camDevice);
+            var src = 'http://' + camDevice.base + '/image?ts=' + StaticTime.getNow();
+            var img = document.createElement('img');
+            img.src = src;
+            var _camDevice = camDevice;
+            img.onload = () => {
+              console.log('------------------------------------------------------------------------', _camDevice.id);
+              document.getElementById('camimg-'+_camDevice.id).setAttribute('src', src);
+            }
+            
+          //}, 100);
+        }
+      });
+    }, 100);
 
   }
 
   ngOnInit(): void {
   }
 
-  refreshDeviceList() {
-    if (!this.userInCamDeviceSetField) {
-      localStorage.setItem('camDevices', JSON.stringify(this.camDeviceList.camDevices));
-      this.loadDeviceList();
-    }
+  ngOnDestroy(): void {
+    this.refreshTimer.kill();
+    this.refreshImagesTimer.kill();
+    this.saveDeviceList();
+  }
+
+  saveDeviceList() {
+    localStorage.setItem('camDevices', JSON.stringify(this.camDeviceList.camDevices));
   }
 
   loadDeviceList() {
@@ -173,7 +202,6 @@ export class DeviceListComponent implements OnInit {
         }
       }
       this.camDeviceList.camDevices = tmp;
-      this.refreshDeviceList();
     }, 500);
   }
 

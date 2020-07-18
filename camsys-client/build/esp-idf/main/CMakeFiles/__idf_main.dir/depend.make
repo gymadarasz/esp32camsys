@@ -79,6 +79,7 @@ esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/compo
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/esp_event/include/esp_event_base.h
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/esp_event/include/esp_event_legacy.h
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/esp_http_client/include/esp_http_client.h
+esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/esp_http_server/include/esp_http_server.h
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/esp_netif/include/esp_netif.h
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/esp_netif/include/esp_netif_defaults.h
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/esp_netif/include/esp_netif_ip_addr.h

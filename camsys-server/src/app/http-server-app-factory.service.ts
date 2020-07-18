@@ -39,7 +39,6 @@ export class HttpServerAppFactoryService {
             req.body.diff_sum_max, 
             req.body.watcher
           );
-          HttpServerAppFactoryService.lastCaller.refreshDeviceList();
           res.send(HttpServerAppFactoryService.lastCaller.getMessageToDevice(camDevice));
         }
       });
