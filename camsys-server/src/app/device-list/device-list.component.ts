@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { HttpServerAppFactoryService } from '../http-server-app-factory.service';
+import { HttpClient } from '@angular/common/http';
 
 class CamDeviceWatcher {
   x: number = 43;
@@ -24,6 +25,7 @@ class CamDevice {
   watcher: CamDeviceWatcher = new CamDeviceWatcher();
   userSet: CamUserSet = new CamUserSet();
   streamUrl: string;
+  resetRequest: boolean = false;
 }
 
 class CamDeviceList {
@@ -138,7 +140,7 @@ export class DeviceListComponent implements OnInit {
   now: number;
 
 
-  constructor(private httpServerAppFactory: HttpServerAppFactoryService) {
+  constructor(private httpServerAppFactory: HttpServerAppFactoryService, private httpClient: HttpClient) {
 
     this.httpServerAppFactory.getHttpServerApp(this);
 
@@ -211,8 +213,27 @@ export class DeviceListComponent implements OnInit {
     }, 500);
   }
 
+  onResetClick(id: string) {
+    setTimeout(() => {
+      for (let key in this.camDeviceList.camDevices) {
+        let camDevice = this.camDeviceList.camDevices[key];
+        if (camDevice.id === id) {
+          camDevice.resetRequest = true;
+          break;
+        }
+      }
+      
+    }, 500);
+  }
+
   getMessageToDevice(camDevice: CamDevice): string {
     let message = "";
+
+    if (camDevice.resetRequest == true) {
+      camDevice.resetRequest = false;
+      message += "reset=1\n";
+    }
+
     if (camDevice.type === 'motion') {
       Object.keys(camDevice.watcher).forEach((key) => {
         if (camDevice.watcher[key] != camDevice.userSet.watcher[key]) {
@@ -221,7 +242,7 @@ export class DeviceListComponent implements OnInit {
       });
     } else if (camDevice.type === 'camera') {
       // TODO ....
-      console.error('camera response should be implemented');
+      console.log('Implement a message here to send camera at join request');
     } else {
       console.error("Incorrect device type: " + camDevice.type);
     }

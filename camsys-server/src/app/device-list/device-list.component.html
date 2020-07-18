@@ -83,26 +83,29 @@
                 <br>
             </div>
 
-            <label>Stream:</label>
-            {{ camDevice.streamUrl }}
-            <br>
-            <img src="{{ camDevice.streamUrl }}">
-            <br>
-
-            <!--
-            <label>Image:</label>
-            <br>
-            <img id="camimg-{{ camDevice.id }}">
-            <br>
-            -->
-
         </ng-template>
+
 
         <ng-template [ngIf]="camDevice.type == 'camera'">
             <!-- TODO ... -->
         </ng-template>
+
+        
+        <label>Stream:</label>
+        {{ camDevice.streamUrl }}
+        <br>
+        <img src="{{ camDevice.streamUrl }}">
+        <br>
+
+        <!--
+        <label>Image:</label>
+        <br>
+        <img id="camimg-{{ camDevice.id }}">
+        <br>
+        -->
         
         <input type="button" value="Forget" (click)="onForgetClick(camDevice.id)">
+        <input type="button" value="Reset" (click)="onResetClick(camDevice.id)">
         <br>
     </li>
 </ul>
