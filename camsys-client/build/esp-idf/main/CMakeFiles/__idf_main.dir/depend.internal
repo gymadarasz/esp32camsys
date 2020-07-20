@@ -26,6 +26,9 @@ esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj
  ../main/lib/esp32-camera/sensors/private_include/ov3660.h
  ../main/lib/esp32-camera/sensors/private_include/ov5640.h
  ../main/lib/esp32-camera/sensors/private_include/ov7725.h
+ /home/gyula/Desktop/esp32camsys/camsys-client/main/app_common.c
+ /home/gyula/Desktop/esp32camsys/camsys-client/main/app_main_camera.c
+ /home/gyula/Desktop/esp32camsys/camsys-client/main/app_main_motion.c
  /home/gyula/Desktop/esp32camsys/camsys-client/main/main.c
  /home/gyula/esp/esp-idf/components/coap/libcoap/include/coap2/address.h
  /home/gyula/esp/esp-idf/components/coap/libcoap/include/coap2/async.h
@@ -55,6 +58,8 @@ esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj
  /home/gyula/esp/esp-idf/components/driver/include/driver/ledc.h
  /home/gyula/esp/esp-idf/components/driver/include/driver/periph_ctrl.h
  /home/gyula/esp/esp-idf/components/driver/include/driver/rtc_io.h
+ /home/gyula/esp/esp-idf/components/driver/include/driver/sdmmc_types.h
+ /home/gyula/esp/esp-idf/components/driver/include/driver/sdspi_host.h
  /home/gyula/esp/esp-idf/components/driver/include/driver/spi_common.h
  /home/gyula/esp/esp-idf/components/driver/include/driver/spi_master.h
  /home/gyula/esp/esp-idf/components/driver/include/driver/uart.h
@@ -106,6 +111,9 @@ esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj
  /home/gyula/esp/esp-idf/components/esp_wifi/include/esp_wifi_crypto_types.h
  /home/gyula/esp/esp-idf/components/esp_wifi/include/esp_wifi_default.h
  /home/gyula/esp/esp-idf/components/esp_wifi/include/esp_wifi_types.h
+ /home/gyula/esp/esp-idf/components/fatfs/src/ff.h
+ /home/gyula/esp/esp-idf/components/fatfs/src/ffconf.h
+ /home/gyula/esp/esp-idf/components/fatfs/vfs/esp_vfs_fat.h
  /home/gyula/esp/esp-idf/components/freertos/include/freertos/FreeRTOS.h
  /home/gyula/esp/esp-idf/components/freertos/include/freertos/deprecated_definitions.h
  /home/gyula/esp/esp-idf/components/freertos/include/freertos/list.h
@@ -258,6 +266,7 @@ esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj
  /home/gyula/esp/esp-idf/components/vfs/include/esp_vfs.h
  /home/gyula/esp/esp-idf/components/vfs/include/esp_vfs_common.h
  /home/gyula/esp/esp-idf/components/vfs/include/esp_vfs_dev.h
+ /home/gyula/esp/esp-idf/components/wear_levelling/include/wear_levelling.h
  /home/gyula/esp/esp-idf/components/xtensa/esp32/include/xtensa/config/core-isa.h
  /home/gyula/esp/esp-idf/components/xtensa/esp32/include/xtensa/config/core-matmap.h
  /home/gyula/esp/esp-idf/components/xtensa/esp32/include/xtensa/config/core.h

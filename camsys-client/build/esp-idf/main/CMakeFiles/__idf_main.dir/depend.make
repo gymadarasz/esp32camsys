@@ -25,6 +25,9 @@ esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: ../main/lib/esp32-camera/sens
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: ../main/lib/esp32-camera/sensors/private_include/ov3660.h
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: ../main/lib/esp32-camera/sensors/private_include/ov5640.h
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: ../main/lib/esp32-camera/sensors/private_include/ov7725.h
+esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: ../main/app_common.c
+esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: ../main/app_main_camera.c
+esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: ../main/app_main_motion.c
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: ../main/main.c
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/coap/libcoap/include/coap2/address.h
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/coap/libcoap/include/coap2/async.h
@@ -54,6 +57,8 @@ esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/compo
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/driver/include/driver/ledc.h
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/driver/include/driver/periph_ctrl.h
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/driver/include/driver/rtc_io.h
+esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/driver/include/driver/sdmmc_types.h
+esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/driver/include/driver/sdspi_host.h
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/driver/include/driver/spi_common.h
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/driver/include/driver/spi_master.h
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/driver/include/driver/uart.h
@@ -105,6 +110,9 @@ esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/compo
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/esp_wifi/include/esp_wifi_crypto_types.h
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/esp_wifi/include/esp_wifi_default.h
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/esp_wifi/include/esp_wifi_types.h
+esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/fatfs/src/ff.h
+esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/fatfs/src/ffconf.h
+esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/fatfs/vfs/esp_vfs_fat.h
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/freertos/include/freertos/FreeRTOS.h
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/freertos/include/freertos/deprecated_definitions.h
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/freertos/include/freertos/list.h
@@ -257,6 +265,7 @@ esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/compo
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/vfs/include/esp_vfs.h
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/vfs/include/esp_vfs_common.h
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/vfs/include/esp_vfs_dev.h
+esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/wear_levelling/include/wear_levelling.h
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/xtensa/esp32/include/xtensa/config/core-isa.h
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/xtensa/esp32/include/xtensa/config/core-matmap.h
 esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj: /home/gyula/esp/esp-idf/components/xtensa/esp32/include/xtensa/config/core.h

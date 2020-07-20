@@ -12,31 +12,9 @@ assert.h
 
 /home/gyula/esp/esp-idf/components/esp_common/include/esp_bit_defs.h
 
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/gpio_caps.h
+/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/gpio_sig_map.h
 
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/rtc_cntl_reg.h
-soc.h
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/soc.h
-
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/rtc_cntl_struct.h
-stdint.h
--
-
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/rtc_io_caps.h
-
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/rtc_io_channel.h
-
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/rtc_io_reg.h
-soc.h
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/soc.h
-
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/rtc_io_struct.h
-stdint.h
--
-
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/sens_struct.h
-stdint.h
--
+/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/periph_defs.h
 
 /home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/soc.h
 stdint.h
@@ -46,27 +24,41 @@ esp_assert.h
 esp_bit_defs.h
 -
 
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/rtc_io_periph.c
-soc/rtc_io_periph.h
-/home/gyula/esp/esp-idf/components/soc/soc/esp32/soc/rtc_io_periph.h
+/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/spi_caps.h
 
-/home/gyula/esp/esp-idf/components/soc/soc/include/soc/rtc_io_periph.h
+/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/spi_reg.h
+soc.h
+/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/soc.h
+
+/home/gyula/esp/esp-idf/components/soc/soc/esp32/include/soc/spi_struct.h
+stdint.h
+-
+
+/home/gyula/esp/esp-idf/components/soc/soc/esp32/spi_periph.c
+soc/spi_periph.h
+/home/gyula/esp/esp-idf/components/soc/soc/esp32/soc/spi_periph.h
+
+/home/gyula/esp/esp-idf/components/soc/soc/include/soc/spi_periph.h
+stdint.h
+-
 soc/soc.h
 /home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/soc.h
-soc/rtc_io_caps.h
-/home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/rtc_io_caps.h
-soc/rtc_io_channel.h
-/home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/rtc_io_channel.h
-soc/rtc_io_reg.h
-/home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/rtc_io_reg.h
-soc/rtc_io_struct.h
-/home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/rtc_io_struct.h
-soc/rtc_cntl_reg.h
-/home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/rtc_cntl_reg.h
-soc/rtc_cntl_struct.h
-/home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/rtc_cntl_struct.h
-soc/sens_struct.h
-/home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/sens_struct.h
-soc/gpio_caps.h
-/home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/gpio_caps.h
+soc/periph_defs.h
+/home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/periph_defs.h
+soc/spi_caps.h
+/home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/spi_caps.h
+soc/spi_reg.h
+/home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/spi_reg.h
+soc/spi_struct.h
+/home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/spi_struct.h
+soc/gpio_sig_map.h
+/home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/gpio_sig_map.h
+sdkconfig.h
+/home/gyula/esp/esp-idf/components/soc/soc/include/soc/sdkconfig.h
+soc/spi_mem_struct.h
+/home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/spi_mem_struct.h
+soc/spi_mem_reg.h
+/home/gyula/esp/esp-idf/components/soc/soc/include/soc/soc/spi_mem_reg.h
+
+config/sdkconfig.h
 

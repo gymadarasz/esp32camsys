@@ -87,12 +87,18 @@
 
 
         <ng-template [ngIf]="camDevice.type == 'camera'">
-            <!-- TODO ... -->
+            <input type="button" value="{{ recordButtonValue }}" (click)="onRecordClick(camDevice)">
+            <br>
+            <label>Recording:</label> 
+            {{ camDevice.recording }}
+            <br>
         </ng-template>
 
         
         <label>Stream:</label>
         {{ camDevice.streamUrl }}
+        <br>
+        <input type="button" value="Stop streaming" (click)="onStopStreamClick(camDevice)">
         <br>
         <img src="{{ camDevice.streamUrl }}">
         <br>

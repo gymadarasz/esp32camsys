@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { HttpServerAppFactoryService } from '../http-server-app-factory.service';
 import { HttpClient } from '@angular/common/http';
+import { RequireService } from '../require.service';
 
 class CamDeviceWatcher {
   x: number = 43;
@@ -26,6 +27,10 @@ class CamDevice {
   userSet: CamUserSet = new CamUserSet();
   streamUrl: string;
   resetRequest: boolean = false;
+  stopStream: boolean = false;
+  recordRequest: boolean = false;
+  recordStopRequest: boolean = false;
+  recording: boolean = false;
 }
 
 class CamDeviceList {
@@ -36,7 +41,7 @@ class CamDeviceList {
     this.camDevices.push(camDevice);
   }
 
-  joinDevice(id: string, type: string, base: string, diffSumMax: number, watcher: CamDeviceWatcher): CamDevice | null {
+  joinDevice(id: string, type: string, base: string, diffSumMax: number, watcher: CamDeviceWatcher, recording: boolean): CamDevice | null {
     let foundDevice: CamDevice = null;
     this.camDevices.forEach((camDevice) => {
       if (!foundDevice && camDevice.id === id) {
@@ -59,7 +64,7 @@ class CamDeviceList {
       foundDevice.diff = diffSumMax;
       foundDevice.watcher = watcher;
     } else if (type === 'camera') {
-      // TODO...
+      foundDevice.recording = recording;
     } else {
       console.error('Invalid type: ', type);
     }
@@ -139,8 +144,10 @@ export class DeviceListComponent implements OnInit {
 
   now: number;
 
+  recordButtonValue: string = 'Record';
 
-  constructor(private httpServerAppFactory: HttpServerAppFactoryService, private httpClient: HttpClient) {
+
+  constructor(private require: RequireService, private httpServerAppFactory: HttpServerAppFactoryService, private httpClient: HttpClient) {
 
     this.httpServerAppFactory.getHttpServerApp(this);
 
@@ -155,12 +162,27 @@ export class DeviceListComponent implements OnInit {
           camDevice.status = 'disconnected';
         } else {
           if (camDevice.status != 'connected') {
-            camDevice.streamUrl = 'http://' + camDevice.base + '/stream?ts=' + StaticTime.getNow();
+            camDevice.streamUrl = this.getCamDeviceStreamUrl(camDevice);
           }
           camDevice.status = 'connected';
         }
       });
     }, 100);
+
+
+    // --------------------- TEST (TODO VIDEO SAVING TO FILES) ----------------------
+    // var request = this.require.import("request");
+    // var MjpegConsumer = this.require.import("mjpeg-consumer");
+    // var FileOnWrite = this.require.import("file-on-write");
+
+    // var writer = new FileOnWrite({ 
+    //   path: './video',
+    //   ext: '.jpg'
+    // });
+    // var consumer = new MjpegConsumer();
+
+    // request("http://192.168.0.106/stream?ts=123").pipe(consumer).pipe(writer);
+    // ------------------------------------------------
 
     // this.refreshImagesTimer = new IntervalTimer(() => {
     //   this.camDeviceList.camDevices.forEach((camDevice, key) => {
@@ -183,10 +205,18 @@ export class DeviceListComponent implements OnInit {
 
   }
 
+  getCamDeviceStreamUrl(camDevice: CamDevice): string {
+    return 'http://' + camDevice.base + '/stream' + (camDevice.type=='motion' ? '-bmp' : '') + '?secret=' + this.httpServerAppFactory.getSecret() + '&ts=' + StaticTime.getNow();
+  }
+
   ngOnInit(): void {
   }
 
   ngOnDestroy(): void {
+    for (let key in this.camDeviceList.camDevices) {
+      this.camDeviceList.camDevices[key].stopStream = true;
+    }
+
     this.refreshTimer.kill();
     // this.refreshImagesTimer.kill();
     this.saveDeviceList();
@@ -198,6 +228,14 @@ export class DeviceListComponent implements OnInit {
 
   loadDeviceList() {
     this.camDeviceList.camDevices = JSON.parse(localStorage.getItem('camDevices')) ?? [];
+
+    for (let key in this.camDeviceList.camDevices) {
+      this.camDeviceList.camDevices[key].resetRequest = false;
+      this.camDeviceList.camDevices[key].stopStream = false;
+      this.camDeviceList.camDevices[key].recordRequest = false;
+      this.camDeviceList.camDevices[key].recordStopRequest = false;
+      this.camDeviceList.camDevices[key].streamUrl = this.getCamDeviceStreamUrl(this.camDeviceList.camDevices[key]);
+    }
   }
 
   onForgetClick(id: string) {
@@ -226,12 +264,31 @@ export class DeviceListComponent implements OnInit {
     }, 500);
   }
 
+  onRecordClick(camDevice: CamDevice) {
+    if (this.recordButtonValue == 'Record') {
+      camDevice.recordRequest = true;
+      this.recordButtonValue = 'Stop';
+    } else {
+      camDevice.recordStopRequest = true;
+      this.recordButtonValue = 'Record';
+    }
+  }
+
+  onStopStreamClick(camDevice: CamDevice) {
+    camDevice.stopStream = true;
+  }
+
   getMessageToDevice(camDevice: CamDevice): string {
     let message = "";
 
     if (camDevice.resetRequest == true) {
       camDevice.resetRequest = false;
       message += "reset=1\n";
+    }
+
+    if (camDevice.stopStream == true) {
+      camDevice.stopStream = false;
+      message += "stopStream=1\n";
     }
 
     if (camDevice.type === 'motion') {
@@ -241,8 +298,14 @@ export class DeviceListComponent implements OnInit {
         }
       });
     } else if (camDevice.type === 'camera') {
-      // TODO ....
-      console.log('Implement a message here to send camera at join request');
+      if (camDevice.recordRequest == true) {
+        camDevice.recordRequest = false;
+        message += "recordRequest=" + StaticTime.getNow() + "\n";
+      }
+      if (camDevice.recordStopRequest == true) {
+        camDevice.recordStopRequest = false;
+        message += "recordStopRequest=1\n";
+      }
     } else {
       console.error("Incorrect device type: " + camDevice.type);
     }

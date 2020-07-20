@@ -6,3 +6,5 @@
 
 #IncludeRegexTransform: 
 
+/home/gyula/Desktop/esp32camsys/camsys-client/build/project_elf_src.c
+

@@ -37,7 +37,8 @@ export class HttpServerAppFactoryService {
             req.body.type, 
             req.body.base,
             req.body.diff_sum_max, 
-            req.body.watcher
+            req.body.watcher,
+            req.body.recording
           );
           res.send(HttpServerAppFactoryService.lastCaller.getMessageToDevice(camDevice));
         }
