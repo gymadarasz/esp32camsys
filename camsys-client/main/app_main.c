@@ -680,6 +680,7 @@ void wifi_app_setup(wifi_app_cb_func_t setup) {
             printf("200 OK Credentials are saved.\n") :
             printf("300 ERROR Saving credential error: %s\n", esp_err_to_name(err));
 
+        setup();
     } else {
         free(key);
         printf("300 ERROR\n");
