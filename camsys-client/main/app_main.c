@@ -11,101 +11,301 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 
-#include "lib/myesp/myesp.h"
 
-static const char *TAG = "app";
+#define CAMSYS_NAMESPACE "camsys"
 
-/*
+static const char *TAG = "camsys";
 
 // ---------------------------------------------------------------
 // DELAY
 // ---------------------------------------------------------------
 
+void delay(long ms) {
+    vTaskDelay(ms / portTICK_RATE_MS);
+}
+
 // ---------------------------------------------------------------
 // ERROR
 // ---------------------------------------------------------------
+
+#define ERROR_BUFF_SIZE 100
+
+#define ERROR(msg) errorlnf(__LINE__, msg)
+#define ERRORF(fmt, ...) errorlnf(__LINE__, fmt, __VA_ARGS__)
+
+void errorlnf(int line, const char* fmt, ...) {
+    char buffer[ERROR_BUFF_SIZE];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buffer, sizeof(buffer), fmt, args);
+    va_end(args);
+
+    printf("ERROR at line %d: %s\n", line, buffer);
+
+    fflush(stdout);
+    delay(1000);
+    esp_restart();
+}
 
 // ---------------------------------------------------------------
 // SERIAL READ
 // ---------------------------------------------------------------
 
-    ESP_ERROR_CHECK( serial_install(UART_NUM_0, ESP_LINE_ENDINGS_CR, ESP_LINE_ENDINGS_CRLF) );
+#define SERIAL_READLN_BUFF_SIZE 255
 
-    ESP_LOGI(TAG, "Give me a string:\n");
-    char* str = serial_readln();
-    ESP_LOGI(TAG, "you wrote: '%s'\n", str ? str : "(read error)");
-    free(str);
+esp_err_t serial_install(uart_port_t port, esp_line_endings_t in_line_ending, esp_line_endings_t out_line_ending) {
+    // Initialize VFS & UART so we can use std::cout/cin
+    if (setvbuf(stdin, NULL, _IONBF, 0)) return ESP_FAIL;
+    /* Install UART driver for interrupt-driven reads and writes */
+    esp_err_t err = uart_driver_install(port, 256, 0, 0, NULL, 0);
+    /* Tell VFS to use UART driver */
+    esp_vfs_dev_uart_use_driver(port);
+    esp_vfs_dev_uart_set_rx_line_endings(in_line_ending);
+    /* Move the caret to the beginning of the next line on '\n' */
+    esp_vfs_dev_uart_set_tx_line_endings(out_line_ending);
+    return err;
+}
 
-    ESP_ERROR_CHECK( serial_uninstall(UART_NUM_0) );
+esp_err_t serial_uninstall(uart_port_t port) {
+    return uart_driver_delete(port);
+}
+
+char* serial_readln() {
+    char* str = calloc(sizeof(char), SERIAL_READLN_BUFF_SIZE + 1);
+    if (!fgets(str, SERIAL_READLN_BUFF_SIZE, stdin)) {
+        free(str);
+        return NULL;
+    }
+    str[strlen(str)-1] = '\0';
+    return str;
+}
 
 // ---------------------------------------------------------------
 // SDCARD READ
 // ---------------------------------------------------------------
 
-    const char str[] = "Hello";
-    ESP_ERROR_CHECK( sdcard_init(esp_vfs_fat_sdspi_mount, false, 5, 16 * 1024) );
+#define SDCARD_TARGET_ESP32S2
+//#define SDCARD_TARGET_ESP32
 
-    const char* fname = SDCARD_MOUNT_POINT"/test.txt";
-    ESP_LOGI(TAG, "Saving it to file '%s'\n", fname);
-    FILE* f = fopen(fname, "w");
-    if (!f) ERROR("File open error.");
-    if (fprintf(f, "Your text is '%s'!\n", str) < 0) ERRORF("File write error: %d", ferror(f));;
-    if (fclose(f)) ERROR("File close error.");
+#ifdef SDCARD_TARGET_ESP32
+#include "driver/sdmmc_host.h"
+#endif
 
-    ESP_ERROR_CHECK( sdcard_close(esp_vfs_fat_sdcard_unmount) );
+#define SDCARD_MOUNT_POINT "/sdcard"
+
+// This example can use SDMMC and SPI peripherals to communicate with SD card.
+// By default, SDMMC peripheral is used.
+// To enable SPI mode, uncomment the following line:
+
+// #define SDCARD_USE_SPI_MODE
+
+// ESP32-S2 doesn't have an SD Host peripheral, always use SPI:
+#ifdef SDCARD_TARGET_ESP32S2
+#ifndef SDCARD_USE_SPI_MODE
+#define SDCARD_USE_SPI_MODE
+#endif // SDCARD_USE_SPI_MODE
+// on ESP32-S2, DMA channel must be the same as host id
+#define SDCARD_SPI_DMA_CHAN    host.slot
+#endif //CONFIG_IDF_TARGET_ESP32S2
+
+// DMA channel to be used by the SPI peripheral
+#ifndef SDCARD_SPI_DMA_CHAN
+#define SDCARD_SPI_DMA_CHAN    1
+#endif //SDCARD_SPI_DMA_CHAN
+
+// When testing SD and SPI modes, keep in mind that once the card has been
+// initialized in SPI mode, it can not be reinitialized in SD mode without
+// toggling power to the card.
+
+#ifdef SDCARD_USE_SPI_MODE
+// Pin mapping when using SPI mode.
+// With this mapping, SD card can be used both in SPI and 1-line SD mode.
+// Note that a pull-up on CS line is required in SD mode.
+#define SDCARD_PIN_NUM_MISO 2
+#define SDCARD_PIN_NUM_MOSI 15
+#define SDCARD_PIN_NUM_CLK  14
+#define SDCARD_PIN_NUM_CS   13
+#endif //SDCARD_USE_SPI_MODE
+
+struct sdcard_s {
+    void* card;
+    int slot;
+};
+
+typedef struct sdcard_s sdcard_t;
+
+/**
+ * @brief Configuration arguments for esp_vfs_fat_sdmmc_mount and esp_vfs_fat_spiflash_mount functions
+ */
+typedef struct {
+    bool format_if_mount_failed;
+    int max_files;
+    size_t allocation_unit_size;
+} sdcard_mount_config_t;
+
+typedef esp_err_t (*sdcard_mount_func_t)(
+    const char* base_path,
+    const sdmmc_host_t* host_config_input,
+    const sdspi_device_config_t* slot_config,
+    const sdcard_mount_config_t* mount_config,
+    sdmmc_card_t** out_card
+);
+
+typedef esp_err_t (*sdcard_unmount_func_t)(const char *base_path, sdmmc_card_t *card);
+
+sdcard_t sdcard = {NULL, 0};
+
+esp_err_t sdcard_init(sdcard_mount_func_t mounter, bool auto_format, int max_files, size_t alloc_unit_size) {
+    esp_err_t ret = ESP_OK;
+    // Options for mounting the filesystem.
+    // If format_if_mount_failed is set to true, SD card will be partitioned and
+    // formatted in case when mounting fails.
+    struct mount_config_s {
+        bool format_if_mount_failed;
+        int max_files;
+        size_t allocation_unit_size;
+    } mount_config;
+    mount_config.format_if_mount_failed = auto_format;
+    mount_config.max_files = max_files;
+    mount_config.allocation_unit_size = alloc_unit_size;
+    //};
     
+    const char mount_point[] = SDCARD_MOUNT_POINT;
+    // ESP_LOGI("sdcard", "Initializing SD card");
+
+    // Use settings defined above to initialize SD card and mount FAT filesystem.
+    // Note: esp_vfs_fat_sdmmc/sdspi_mount is all-in-one convenience functions.
+    // Please check its source code and implement error recovery when developing
+    // production applications.
+#ifndef SDCARD_USE_SPI_MODE
+    // ESP_LOGI("sdcard", "Using SDMMC peripheral");
+    sdmmc_host_t host = SDMMC_HOST_DEFAULT();
+
+    // This initializes the slot without card detect (CD) and write protect (WP) signals.
+    // Modify slot_config.gpio_cd and slot_config.gpio_wp if your board has these signals.
+    sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
+
+    // To use 1-line SD mode, uncomment the following line:
+    // slot_config.width = 1;
+
+    // GPIOs 15, 2, 4, 12, 13 should have external 10k pull-ups.
+    // Internal pull-ups are not sufficient. However, enabling internal pull-ups
+    // does make a difference some boards, so we do that here.
+    gpio_set_pull_mode(15, GPIO_PULLUP_ONLY);   // CMD, needed in 4- and 1- line modes
+    gpio_set_pull_mode(2, GPIO_PULLUP_ONLY);    // D0, needed in 4- and 1-line modes
+    gpio_set_pull_mode(4, GPIO_PULLUP_ONLY);    // D1, needed in 4-line mode only
+    gpio_set_pull_mode(12, GPIO_PULLUP_ONLY);   // D2, needed in 4-line mode only
+    gpio_set_pull_mode(13, GPIO_PULLUP_ONLY);   // D3, needed in 4- and 1-line modes
+
+    ret = esp_vfs_fat_sdmmc_mount(mount_point, &host, &slot_config, &mount_config, &sdcard.card);
+#else
+    // ESP_LOGI("sdcard", "Using SPI peripheral");
+
+    sdmmc_host_t host = SDSPI_HOST_DEFAULT();
+    spi_bus_config_t bus_cfg = {
+        .mosi_io_num = SDCARD_PIN_NUM_MOSI,
+        .miso_io_num = SDCARD_PIN_NUM_MISO,
+        .sclk_io_num = SDCARD_PIN_NUM_CLK,
+        .quadwp_io_num = -1,
+        .quadhd_io_num = -1,
+        .max_transfer_sz = 4000,
+    };
+    ret = spi_bus_initialize(host.slot, &bus_cfg, SDCARD_SPI_DMA_CHAN);
+    if (ret != ESP_OK) {
+        // ESP_LOGE("sdcard", "Failed to initialize bus.");
+        sdcard.slot = host.slot;
+        return ret;
+    }
+
+    // This initializes the slot without card detect (CD) and write protect (WP) signals.
+    // Modify slot_config.gpio_cd and slot_config.gpio_wp if your board has these signals.
+    sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
+    slot_config.gpio_cs = SDCARD_PIN_NUM_CS;
+    slot_config.host_id = host.slot;
+
+    ret = mounter(mount_point, &host, &slot_config, &mount_config, &sdcard.card);
+#endif //USE_SPI_MODE
+
+    if (ret != ESP_OK) {
+        if (ret == ESP_FAIL) {
+            // ESP_LOGE("sdcard", "Failed to mount filesystem. "
+            //     "If you want the card to be formatted, set the EXAMPLE_FORMAT_IF_MOUNT_FAILED menuconfig option.");
+        } else {
+            // ESP_LOGE("sdcard", "Failed to initialize the card (%s). "
+            //     "Make sure SD card lines have pull-up resistors in place.", esp_err_to_name(ret));
+        }
+        sdcard.slot = host.slot;
+        return ret;
+    }
+
+    // Card has been initialized, print its properties
+    // sdmmc_card_print_info(stdout, card);
+
+    sdcard.slot = host.slot;
+    return ret;
+}
+
+esp_err_t sdcard_close(sdcard_unmount_func_t unmounter) {
+    // All done, unmount partition and disable SDMMC or SPI peripheral
+    esp_err_t err_vfs = unmounter(SDCARD_MOUNT_POINT, sdcard.card);
+    // ESP_LOGE("sdcard", "Card unmounted");
+    esp_err_t err_spi = ESP_OK;
+#ifdef SDCARD_USE_SPI_MODE
+    //deinitialize the bus after all devices are removed
+    err_spi = spi_bus_free(sdcard.slot);
+#endif
+    return err_vfs ? err_vfs : err_spi;
+}
+
 // ---------------------------------------------------------------
 // STRING EXTRAS
 // ---------------------------------------------------------------
 
+char* strncpy_offs(char* dest, size_t offs, const char* src, size_t max) {
+    int i=0;
+    for (; i+offs<max; i++) {
+        if (!src[i]) break;
+        dest[i+offs] = src[i];
+    }
+    dest[i+offs] = '\0';
+    return dest;
+}
+
 // ---------------------------------------------------------------
 // WIFI CREDENTIALS
 // ---------------------------------------------------------------
 
-    wifi_creds_t creds;
-    wifi_creds_clear(creds);
-    
-    WIFI_CREDS_SET(creds, 0, "apuc", "mad12345a");
-    WIFI_CREDS_SET(creds, 1, "foo", "bar");
-    WIFI_CREDS_SET(creds, 2, "abc", "asd");
-    // ..
-    WIFI_CREDS_SET(creds, 6, "eee7", "");
-    // ..
-    WIFI_CREDS_SET(creds, 8, "eee6", "rrrr6");
-    
-    const char* found_ssid = "abc";
-    
+
+#define WIFI_CREDENTIALS 10
+#define WIFI_SSID_SIZE 32
+#define WIFI_PSWD_SIZE 64
+#define WIFI_CRED_SIZE ((WIFI_SSID_SIZE) + (WIFI_PSWD_SIZE))
+#define WIFI_CREDS_SIZE ((WIFI_CREDENTIALS) * (WIFI_CRED_SIZE))
+
+
+#define WIFI_CREDS_SET(creds, i, ssid, pswd) { \
+    strncpy_offs(creds, i*WIFI_CRED_SIZE, ssid, WIFI_CREDS_SIZE); \
+    strncpy_offs(creds, i*WIFI_CRED_SIZE+WIFI_SSID_SIZE, pswd, WIFI_CREDS_SIZE); \
+}
+
+#define WIFI_CREDS_GET_SSID(creds, i) (&creds[i * (WIFI_CRED_SIZE)])
+#define WIFI_CREDS_GET_PSWD(creds, i) (&creds[i * (WIFI_CRED_SIZE) + (WIFI_SSID_SIZE)])
+
+
+typedef char wifi_creds_t[WIFI_CREDS_SIZE];
+
+void wifi_creds_clear(wifi_creds_t creds) {
+    for (int i=0; i<WIFI_CREDENTIALS; i++) WIFI_CREDS_SET(creds, i, "", "");
+}
+
+char* wifi_creds_get_pswd(wifi_creds_t creds, const char* ssid) {
     for (int i=0; i<WIFI_CREDENTIALS; i++) {
-        if (WIFI_CREDS_GET_SSID(creds, i)[0] && wifi_creds_get_pswd(creds, WIFI_CREDS_GET_SSID(creds, i) )) {
-            ESP_LOGI(TAG, "could connect to: [%d] -> '%s', '%s'\n", i, WIFI_CREDS_GET_SSID(creds, i), WIFI_CREDS_GET_PSWD(creds, i));
-            if (!strcmp(found_ssid, WIFI_CREDS_GET_SSID(creds, i))) {
-                ESP_LOGI(TAG, "^^FOUND: attempt to connect...\n");
-            }
+        if (!strcmp(WIFI_CREDS_GET_SSID(creds, i), ssid)) {
+            return WIFI_CREDS_GET_PSWD(creds, i);
         }
     }
-
-    // ---------------------------------------------------------------
-
-    wifi_creds_t creds;
-    WIFI_CREDS_SET(creds, 0, "apucika", "mad12345");
-    WIFI_CREDS_SET(creds, 1, "apucika_EXT", "mad12345");
-
-    for (int i=0; i<WIFI_CREDENTIALS; i++) {
-        if (WIFI_CREDS_GET_SSID(creds, i)[0])
-            ESP_LOGI(TAG, "cred(%d):'%s':'%s' => '%s'\n", i, 
-                WIFI_CREDS_GET_SSID(creds, i), 
-                WIFI_CREDS_GET_PSWD(creds, i), 
-                wifi_creds_get_pswd(creds,WIFI_CREDS_GET_SSID(creds, i))
-            );
-    }
-
-
-
-*/
-
-// ---------------------------------------------------------------
-// WIFI CREDENTIALS
-// ---------------------------------------------------------------
+    return NULL;
+}
 
 esp_err_t wifi_creds_save(wifi_creds_t creds, const char* namespace) {
     // Open
