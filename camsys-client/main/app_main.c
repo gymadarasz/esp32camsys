@@ -10,11 +10,17 @@
 #include "esp_system.h"
 #include "nvs_flash.h"
 #include "nvs.h"
+#include "hal/uart_types.h"
+#include "esp_vfs_common.h"
+#include "driver/uart.h"
+#include "esp_vfs_dev.h"
+#include "driver/sdmmc_types.h"
+#include "driver/sdspi_host.h"
 
 
 #define CAMSYS_NAMESPACE "camsys"
 
-static const char *TAG = "camsys";
+static const char *TAG = CAMSYS_NAMESPACE;
 
 // ---------------------------------------------------------------
 // DELAY
@@ -128,7 +134,7 @@ char* serial_readln() {
 #endif //SDCARD_USE_SPI_MODE
 
 struct sdcard_s {
-    void* card;
+    sdmmc_card_t* card;
     int slot;
 };
 
@@ -160,11 +166,12 @@ esp_err_t sdcard_init(sdcard_mount_func_t mounter, bool auto_format, int max_fil
     // Options for mounting the filesystem.
     // If format_if_mount_failed is set to true, SD card will be partitioned and
     // formatted in case when mounting fails.
-    struct mount_config_s {
-        bool format_if_mount_failed;
-        int max_files;
-        size_t allocation_unit_size;
-    } mount_config;
+    // struct mount_config_s {
+    //     bool format_if_mount_failed;
+    //     int max_files;
+    //     size_t allocation_unit_size;
+    // } mount_config
+    sdcard_mount_config_t mount_config;
     mount_config.format_if_mount_failed = auto_format;
     mount_config.max_files = max_files;
     mount_config.allocation_unit_size = alloc_unit_size;
@@ -307,45 +314,24 @@ char* wifi_creds_get_pswd(wifi_creds_t creds, const char* ssid) {
     return NULL;
 }
 
-esp_err_t wifi_creds_save(wifi_creds_t creds, const char* namespace) {
-    // Open
-    nvs_handle_t handle;
-    esp_err_t err = nvs_open(namespace && namespace[0] ? namespace : MYESP_NAMESPACE, NVS_READWRITE, &handle);
-    if (err != ESP_OK) return err;
-
+esp_err_t wifi_creds_save(nvs_handle_t handle, wifi_creds_t creds) {
     // Write
-    err = nvs_set_blob(handle, "wifi_creds", creds, WIFI_CREDS_SIZE);
+    esp_err_t err = nvs_set_blob(handle, "wifi_creds", creds, WIFI_CREDS_SIZE);
     if (err == ESP_OK) err = nvs_commit(handle);
-
-    // Close
-    nvs_close(handle);
     
     return err;
 }
 
-esp_err_t wifi_creds_load(wifi_creds_t creds, const char* namespace) {
-    wifi_creds_clear(creds);
-    // // WIFI_CREDS_SET(creds, 0, "apucika", "mad12345");
-    // // WIFI_CREDS_SET(creds, 1, "apucika_EXT", "mad12345");
-    // WIFI_CREDS_SET(creds, 2, "Ulefone_S1", "dde33cc5ed6c");
-
-    // Open
-    nvs_handle_t handle;
-    esp_err_t err = nvs_open(namespace && namespace[0] ? namespace : MYESP_NAMESPACE, NVS_READWRITE, &handle);
-    if (err != ESP_OK) return err;
-
+esp_err_t wifi_creds_load(nvs_handle handle, wifi_creds_t creds) {
     // Read
     size_t length = WIFI_CREDS_SIZE;
-    err = nvs_get_blob(handle, "wifi_creds", creds, &length);
+    esp_err_t err = nvs_get_blob(handle, "wifi_creds", creds, &length);
     if (err == ESP_ERR_NVS_NOT_FOUND) {
         wifi_creds_clear(creds);
         length = WIFI_CREDS_SIZE;
         err = ESP_OK;
     }
     if (err == ESP_OK) if (length != WIFI_CREDS_SIZE) err = ESP_FAIL;
-
-    // Close
-    nvs_close(handle);
     
     return err;
 }
@@ -381,7 +367,6 @@ void gpio_pins_init(uint64_t _pin_bit_mask) {
 // ---------------------------------------------------------------
 // WIFI APP
 // ---------------------------------------------------------------
-
 
 #define WIFI_SCAN_LIST_SIZE 10
 
@@ -580,9 +565,10 @@ esp_err_t wifi_scan_connect(wifi_creds_t creds) {
     return ESP_ERR_WIFI_NOT_CONNECT;
 }
 
-typedef void (*wifi_app_cb_func_t)(void);
+typedef void (*wifi_app_settings_func_t)(nvs_handle_t handle);
+typedef void (*wifi_app_loop_func_t)(void);
 
-void wifi_connection_establish(wifi_creds_t creds, wifi_app_cb_func_t loop) {
+void wifi_connection_establish(wifi_creds_t creds, wifi_app_loop_func_t loop) {
     while(ESP_OK != wifi_scan_connect(creds)) {
         loop();
         ESP_LOGI(TAG, "WIFI connection failed. retry...\n");   
@@ -590,14 +576,14 @@ void wifi_connection_establish(wifi_creds_t creds, wifi_app_cb_func_t loop) {
     ESP_LOGI(TAG, "WIFI is now connected.\n"); 
 }
 
-void wifi_connection_keep_alive(wifi_creds_t creds, wifi_app_cb_func_t loop) {
+void wifi_connection_keep_alive(wifi_creds_t creds, wifi_app_loop_func_t loop) {
     if (wifi_disconnected) wifi_connection_establish(creds, loop);
 }
 
 
 bool wifi_app_exited = false;
 
-void wifi_app_run(wifi_creds_t creds, wifi_app_cb_func_t loop_while_connecting, wifi_app_cb_func_t loop_with_connection) {
+void wifi_app_run(wifi_creds_t creds, wifi_app_loop_func_t loop_while_connecting, wifi_app_loop_func_t loop_with_connection) {
     wifi_init();
 
     wifi_connection_establish(creds, loop_while_connecting);
@@ -609,12 +595,12 @@ void wifi_app_run(wifi_creds_t creds, wifi_app_cb_func_t loop_while_connecting, 
     ESP_LOGI(TAG, "\nOK, LEAVING...");
 }
 
-#define WIFI_APP_MODE_SETUP 0
+#define WIFI_APP_MODE_SETTING 0
 #define WIFI_APP_MODE_RUN 1
 
 int wifi_app_get_mode() {
     gpio_pins_init(1ULL<<GPIO_NUM_13);
-    return gpio_get_level(GPIO_NUM_13) ? WIFI_APP_MODE_RUN : WIFI_APP_MODE_SETUP;
+    return gpio_get_level(GPIO_NUM_13) ? WIFI_APP_MODE_RUN : WIFI_APP_MODE_SETTING;
 }
 
 // --------------
@@ -644,13 +630,15 @@ mad12345
 ....
 
 200 OK Credentials are saved.
-
+100 HOST:
+192.168.0.200
+200 OK
 */
 
 // TODO: Unique code for each device. Should be changed before flash!
 #define WIFI_APP_SETTINGS_KEY "KF4GTX9"
 
-void wifi_app_setup(wifi_app_cb_func_t setup) {
+void wifi_app_settings(nvs_handle_t handle, wifi_app_settings_func_t settings) {
     ESP_ERROR_CHECK( serial_install(UART_NUM_0, ESP_LINE_ENDINGS_CR, ESP_LINE_ENDINGS_CRLF) );
 
     printf("100 KEY\n");
@@ -675,12 +663,12 @@ void wifi_app_setup(wifi_app_cb_func_t setup) {
             free(pswd);            
         }
 
-        esp_err_t err = wifi_creds_save(creds, "camsys");
+        esp_err_t err = wifi_creds_save(handle, creds);
         ESP_OK == err ?             
             printf("200 OK Credentials are saved.\n") :
             printf("300 ERROR Saving credential error: %s\n", esp_err_to_name(err));
 
-        setup();
+        settings(handle);
     } else {
         free(key);
         printf("300 ERROR\n");
@@ -689,47 +677,84 @@ void wifi_app_setup(wifi_app_cb_func_t setup) {
     ESP_ERROR_CHECK( serial_uninstall(UART_NUM_0) );
 }
 
-// --------------
+// ---------------------------------------------------------------
+// WEBSOCKET CLIENT APP (settings)
+// ---------------------------------------------------------------
 
-void app_setup() {
-    ESP_LOGI(TAG, "App setup when wifi setting just readed..\n");
-    printf("app setup..\n");
-    delay(1000);
+esp_err_t wscli_host_save(nvs_handle_t handle, const char* host) {
+    // Write
+    esp_err_t err = nvs_set_str(handle, "host", host);
+    if (err == ESP_OK) err = nvs_commit(handle);
+    
+    return err;
 }
 
-void app_loop_while_connecting() {
+esp_err_t wscli_host_load(nvs_handle_t handle, char* host, size_t length) {
+    size_t required_size;
+    esp_err_t err = nvs_get_str(handle, "host", NULL, &required_size);
+    if (err == ESP_OK) {
+        if (required_size >= length) return ESP_ERR_NVS_INVALID_LENGTH;
+        err = nvs_get_str(handle, "host", host, &required_size);
+    }
+    return err;
+}
+
+void wscli_app_settings(nvs_handle_t handle) {
+    printf("100 HOST:\n");
+    char* host = serial_readln();
+    esp_err_t err = wscli_host_save(handle, host);
+    ESP_OK == err ?             
+        printf("200 OK\n") :
+        printf("300 ERROR - %s\n", esp_err_to_name(err));
+    free(host);
+}
+
+// ---------------------------------------------------------------
+// WEBSOCKET CLIENT APP (loops)
+// ---------------------------------------------------------------
+
+void wscli_app_loop_while_connecting() {
     ESP_LOGI(TAG, "App working when no wifi..\n");
     printf("no wifi..\n");
     delay(1000);
 }
 
-void app_loop_with_connection() {
+void wscli_app_loop_with_connection() {
     ESP_LOGI(TAG, "App working when wifi connected..\n");
     printf("has wifi..\n");
     delay(1000);
 }
+
+// -----------
 
 void app_main(void)
 {
     //esp_log_level_set("*", ESP_LOG_NONE);
 
     flash_init();
+
+    // NVS Open
+    nvs_handle_t handle;
+    ESP_ERROR_CHECK( nvs_open(CAMSYS_NAMESPACE, NVS_READWRITE, &handle) );
     
     wifi_creds_t creds;
     int mode = wifi_app_get_mode();
     switch (mode) {
-        case WIFI_APP_MODE_SETUP:
-            wifi_app_setup(app_setup);
+        case WIFI_APP_MODE_SETTING:
+            wifi_app_settings(handle, wscli_app_settings);
             break;
         case WIFI_APP_MODE_RUN:
 
-            ESP_ERROR_CHECK( wifi_creds_load(creds, "camsys") );
+            ESP_ERROR_CHECK( wifi_creds_load(handle, creds) );
 
-            wifi_app_run(creds, app_loop_while_connecting, app_loop_with_connection);
+            wifi_app_run(creds, wscli_app_loop_while_connecting, wscli_app_loop_with_connection);
             break;
         default:
             ESP_LOGE(TAG, "Incorrect Wifi App Mode: %d", mode);
     }
+
+    // NVS Close
+    nvs_close(handle);
 
     fflush(stdout);
     delay(1000);
