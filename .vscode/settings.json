@@ -17,6 +17,18 @@
         "streambuf": "cpp",
         "*.ipp": "cpp",
         "protocol_examples_common.h": "c",
-        "typeinfo": "c"
+        "typeinfo": "c",
+        "*.inc": "c",
+        "future": "c",
+        "atomic": "c",
+        "cmath": "c",
+        "random": "c",
+        "limits": "c",
+        "string": "c",
+        "unordered_map": "c",
+        "fstream": "c",
+        "cstdlib": "c",
+        "cstring": "c",
+        "cassert": "c"
     }
 }

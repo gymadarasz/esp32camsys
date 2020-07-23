@@ -1,4 +1,5 @@
-COMPONENT_ADD_INCLUDEDIRS := driver/include conversions/include
-COMPONENT_PRIV_INCLUDEDIRS := driver/private_include conversions/private_include sensors/private_include
-COMPONENT_SRCDIRS := driver conversions sensors
-CXXFLAGS += -fno-rtti
+#
+# "main" pseudo-component makefile.
+#
+# (Uses default behaviour of compiling all source files in directory, adding 'include' to include path.)
+
