@@ -448,7 +448,7 @@ esp_event_handler_instance_t wifi_handle_instance_disconnect;
 static void wifi_disconnect_event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data) 
 {
-    ESP_LOGI(TAG, "WIFI DISCONNECT EVENT HANDLER:%d, TODO: reconnect...", event_id);
+    ESP_LOGI(TAG, "WIFI DISCONNECT EVENT HANDLER:%d, reconnect...", event_id);
     ESP_ERROR_CHECK(
         esp_event_handler_instance_unregister(
             WIFI_EVENT, 
@@ -565,9 +565,11 @@ esp_err_t wifi_scan_connect(wifi_creds_t creds) {
     return ESP_ERR_WIFI_NOT_CONNECT;
 }
 
+
+
 typedef void (*wifi_app_settings_func_t)(nvs_handle_t handle);
 typedef void (*wifi_app_loop_func_t)(
-    nvs_handle_t handle, 
+    nvs_handle_t handle, // TODO pass it as a struct
     wifi_creds_t creds
 );
 
@@ -723,10 +725,10 @@ void wifi_app_main(
 }
 
 // ---------------------------------------------------------------
-// WIFI WEBSOCKET CLIENT APP (settings)
+// WEBSOCKET CLIENT APP (settings)
 // ---------------------------------------------------------------
 
-esp_err_t wscli_host_save(nvs_handle_t handle, const char* host) {
+esp_err_t wscli_app_host_save(nvs_handle_t handle, const char* host) {
     // Write
     esp_err_t err = nvs_set_str(handle, "host", host);
     if (err == ESP_OK) err = nvs_commit(handle);
@@ -734,7 +736,7 @@ esp_err_t wscli_host_save(nvs_handle_t handle, const char* host) {
     return err;
 }
 
-esp_err_t wscli_host_load(nvs_handle_t handle, char* host, size_t length) {
+esp_err_t wscli_app_host_load(nvs_handle_t handle, char* host, size_t length) {
     size_t required_size;
     esp_err_t err = nvs_get_str(handle, "host", NULL, &required_size);
     if (err == ESP_OK) {
@@ -747,7 +749,7 @@ esp_err_t wscli_host_load(nvs_handle_t handle, char* host, size_t length) {
 void wscli_app_settings(nvs_handle_t handle) {
     printf("100 HOST:\n");
     char* host = serial_readln();
-    esp_err_t err = wscli_host_save(handle, host);
+    esp_err_t err = wscli_app_host_save(handle, host);
     ESP_OK == err ?             
         printf("200 OK\n") :
         printf("300 ERROR - %s\n", esp_err_to_name(err));
@@ -755,83 +757,83 @@ void wscli_app_settings(nvs_handle_t handle) {
 }
 
 // ---------------------------------------------------------------
-// WIFI WEBSOCKET CLIENT APP (loops)
+// WIFI CLIENT APP (loops)
 // ---------------------------------------------------------------
 
-#define WSCLI_APP_STAT_WIFI_STARTED              1
-#define WSCLI_APP_STAT_WIFI_CONNECTING           2
-#define WSCLI_APP_STAT_WIFI_CONNECTED            3
-#define WSCLI_APP_STAT_WIFI_DISCONNECTED         4
-#define WSCLI_APP_STAT_WIFI_RECONNECTING         5
-#define WSCLI_APP_STAT_WIFI_RECONNECTED          6
+#define WIFI_APP_STAT_WIFI_STARTED              1
+#define WIFI_APP_STAT_WIFI_CONNECTING           2
+#define WIFI_APP_STAT_WIFI_CONNECTED            3
+#define WIFI_APP_STAT_WIFI_DISCONNECTED         4
+#define WIFI_APP_STAT_WIFI_RECONNECTING         5
+#define WIFI_APP_STAT_WIFI_RECONNECTED          6
 
-#define WSCLI_APP_STAT_WEBSCOKECT_STARTED       11 // TODO..
-#define WSCLI_APP_STAT_WEBSCOKECT_CONNECTING    12
-#define WSCLI_APP_STAT_WEBSCOKECT_CONNECTED     13
-#define WSCLI_APP_STAT_WEBSCOKECT_DISCONNECTED  14
-#define WSCLI_APP_STAT_WEBSCOKECT_RECONNECTING  15
-#define WSCLI_APP_STAT_WEBSCOKECT_RECONNECTED   16
-#define WSCLI_APP_STAT_WEBSCOKECT_DATA          21
-#define WSCLI_APP_STAT_WEBSCOKECT_ERROR         22
+// #define WIFI_APP_STAT_WEBSCOKECT_STARTED       11 // TODO..
+// #define WIFI_APP_STAT_WEBSCOKECT_CONNECTING    12
+// #define WIFI_APP_STAT_WEBSCOKECT_CONNECTED     13
+// #define WIFI_APP_STAT_WEBSCOKECT_DISCONNECTED  14
+// #define WIFI_APP_STAT_WEBSCOKECT_RECONNECTING  15
+// #define WIFI_APP_STAT_WEBSCOKECT_RECONNECTED   16
+// #define WIFI_APP_STAT_WEBSCOKECT_DATA          21
+// #define WIFI_APP_STAT_WEBSCOKECT_ERROR         22
 
-int wscli_app_loop_status = WSCLI_APP_STAT_WIFI_STARTED;
+int wifi_app_loop_status = WIFI_APP_STAT_WIFI_STARTED;
 
-void wscli_app_loop_while_connecting(nvs_handle_t handle, wifi_creds_t creds) {
-    switch (wscli_app_loop_status) {
-        case WSCLI_APP_STAT_WIFI_STARTED:
-            ESP_LOGI(TAG, "WSCLI_APP_STAT_WIFI_STARTED");
-            wscli_app_loop_status = WSCLI_APP_STAT_WIFI_CONNECTING;
+void wifi_app_loop_while_connecting(nvs_handle_t handle, wifi_creds_t creds) {
+    switch (wifi_app_loop_status) {
+        case WIFI_APP_STAT_WIFI_STARTED:
+            ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_STARTED");
+            wifi_app_loop_status = WIFI_APP_STAT_WIFI_CONNECTING;
             break;
-        case WSCLI_APP_STAT_WIFI_CONNECTING:
-            ESP_LOGI(TAG, "WSCLI_APP_STAT_WIFI_CONNECTING");
+        case WIFI_APP_STAT_WIFI_CONNECTING:
+            ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_CONNECTING");
             // todo callback loop
             delay(1000);
             break;
-        case WSCLI_APP_STAT_WIFI_CONNECTED:
-            ESP_LOGI(TAG, "WSCLI_APP_STAT_WIFI_CONNECTED");
-            wscli_app_loop_status = WSCLI_APP_STAT_WIFI_DISCONNECTED;
+        case WIFI_APP_STAT_WIFI_CONNECTED:
+            ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_CONNECTED");
+            wifi_app_loop_status = WIFI_APP_STAT_WIFI_DISCONNECTED;
             break;
-        case WSCLI_APP_STAT_WIFI_DISCONNECTED:
-            ESP_LOGI(TAG, "WSCLI_APP_STAT_WIFI_DISCONNECTED");
-            wscli_app_loop_status = WSCLI_APP_STAT_WIFI_RECONNECTING;
+        case WIFI_APP_STAT_WIFI_DISCONNECTED:
+            ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_DISCONNECTED");
+            wifi_app_loop_status = WIFI_APP_STAT_WIFI_RECONNECTING;
             break;
-        case WSCLI_APP_STAT_WIFI_RECONNECTING:
-            ESP_LOGI(TAG, "WSCLI_APP_STAT_WIFI_RECONNECTING");
+        case WIFI_APP_STAT_WIFI_RECONNECTING:
+            ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_RECONNECTING");
             // todo callback loop
             delay(1000);
             break;
         default:
-            ESP_LOGE(TAG, "wscli_app_loop_status error (wscli_app_loop_while_connecting): %d", wscli_app_loop_status);
+            ESP_LOGE(TAG, "wifi_app_loop_status error (wifi_app_loop_while_connecting): %d", wifi_app_loop_status);
             // TODO error
     }
 }
 
-void wscli_app_loop_with_connection(nvs_handle_t handle, wifi_creds_t creds) {
-    switch (wscli_app_loop_status) {
-        case WSCLI_APP_STAT_WIFI_STARTED:
-            ESP_LOGI(TAG, "WSCLI_APP_STAT_WIFI_STARTED");
-            wscli_app_loop_status = WSCLI_APP_STAT_WIFI_CONNECTING;
+void wifi_app_loop_with_connection(nvs_handle_t handle, wifi_creds_t creds) {
+    switch (wifi_app_loop_status) {
+        case WIFI_APP_STAT_WIFI_STARTED:
+            ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_STARTED");
+            wifi_app_loop_status = WIFI_APP_STAT_WIFI_CONNECTING;
             break;
-        case WSCLI_APP_STAT_WIFI_CONNECTING:
-            ESP_LOGI(TAG, "WSCLI_APP_STAT_WIFI_CONNECTING");
-            wscli_app_loop_status = WSCLI_APP_STAT_WIFI_CONNECTED;
+        case WIFI_APP_STAT_WIFI_CONNECTING:
+            ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_CONNECTING");
+            wifi_app_loop_status = WIFI_APP_STAT_WIFI_CONNECTED;
             break;
-        case WSCLI_APP_STAT_WIFI_CONNECTED:
-            ESP_LOGI(TAG, "WSCLI_APP_STAT_WIFI_CONNECTED");
+        case WIFI_APP_STAT_WIFI_CONNECTED:
+            ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_CONNECTED");
             // todo callback loop
             delay(1000);
             break;
-        case WSCLI_APP_STAT_WIFI_RECONNECTING:
-            ESP_LOGI(TAG, "WSCLI_APP_STAT_WIFI_RECONNECTING");
-            wscli_app_loop_status = WSCLI_APP_STAT_WIFI_RECONNECTED;
+        case WIFI_APP_STAT_WIFI_RECONNECTING:
+            ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_RECONNECTING");
+            wifi_app_loop_status = WIFI_APP_STAT_WIFI_RECONNECTED;
             break;
-        case WSCLI_APP_STAT_WIFI_RECONNECTED:
-            ESP_LOGI(TAG, "WSCLI_APP_STAT_WIFI_RECONNECTED");
+        case WIFI_APP_STAT_WIFI_RECONNECTED:
+            ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_RECONNECTED");
             // todo callback loop
                 delay(1000);
             break;
         default:
-            ESP_LOGE(TAG, "wscli_app_loop_status error (wscli_app_loop_with_connection): %d", wscli_app_loop_status);
+            ESP_LOGE(TAG, "wifi_app_loop_status error (wifi_app_loop_with_connection): %d", wifi_app_loop_status);
             // TODO error
     }
 }
@@ -847,8 +849,9 @@ void app_main(void)
     wifi_app_main(
         CAMSYS_NAMESPACE,
         wscli_app_settings,
-        wscli_app_loop_while_connecting,
-        wscli_app_loop_with_connection
+        wifi_app_loop_while_connecting,
+        wifi_app_loop_with_connection
+        // TODO: pass more function to handle wifi events
     );
 
     fflush(stdout);
