@@ -301,6 +301,25 @@ char* strncpy_offs(char* dest, size_t offs, const char* src, size_t max) {
 
 typedef char wifi_creds_t[WIFI_CREDS_SIZE];
 
+
+typedef void (*wifi_app_settings_func_t)(void* app);
+typedef void (*wifi_app_loop_func_t)(void* app);
+
+struct wifi_app_s {
+    const char* namespace;
+    nvs_handle_t nvs_handle;
+    wifi_creds_t wifi_creds;
+    int mode;
+    int wifi_loop_status;
+    bool exited;
+    wifi_app_settings_func_t ext_settings_func;
+    wifi_app_loop_func_t loop_while_connecting_func;
+    wifi_app_loop_func_t loop_with_connection_func;
+};
+
+typedef struct wifi_app_s wifi_app_t;
+
+
 void wifi_creds_clear(wifi_creds_t creds) {
     for (int i=0; i<WIFI_CREDENTIALS; i++) WIFI_CREDS_SET(creds, i, "", "");
 }
@@ -314,20 +333,20 @@ char* wifi_creds_get_pswd(wifi_creds_t creds, const char* ssid) {
     return NULL;
 }
 
-esp_err_t wifi_creds_save(nvs_handle_t handle, wifi_creds_t creds) {
+esp_err_t wifi_creds_save(wifi_app_t* app) {
     // Write
-    esp_err_t err = nvs_set_blob(handle, "wifi_creds", creds, WIFI_CREDS_SIZE);
-    if (err == ESP_OK) err = nvs_commit(handle);
+    esp_err_t err = nvs_set_blob(app->nvs_handle, "wifi_creds", app->wifi_creds, WIFI_CREDS_SIZE);
+    if (err == ESP_OK) err = nvs_commit(app->nvs_handle);
     
     return err;
 }
 
-esp_err_t wifi_creds_load(nvs_handle handle, wifi_creds_t creds) {
+esp_err_t wifi_creds_load(wifi_app_t* app) {
     // Read
     size_t length = WIFI_CREDS_SIZE;
-    esp_err_t err = nvs_get_blob(handle, "wifi_creds", creds, &length);
+    esp_err_t err = nvs_get_blob(app->nvs_handle, "wifi_creds", app->wifi_creds, &length);
     if (err == ESP_ERR_NVS_NOT_FOUND) {
-        wifi_creds_clear(creds);
+        wifi_creds_clear(app->wifi_creds);
         length = WIFI_CREDS_SIZE;
         err = ESP_OK;
     }
@@ -566,41 +585,28 @@ esp_err_t wifi_scan_connect(wifi_creds_t creds) {
 }
 
 
-
-typedef void (*wifi_app_settings_func_t)(nvs_handle_t handle);
-typedef void (*wifi_app_loop_func_t)(
-    nvs_handle_t handle, // TODO pass it as a struct
-    wifi_creds_t creds
-);
-
-void wifi_connection_establish(nvs_handle_t handle, wifi_creds_t creds, wifi_app_loop_func_t loop) {
-    while(ESP_OK != wifi_scan_connect(creds)) {
-        if (loop) loop(handle, creds);
+void wifi_connection_establish(wifi_app_t* app) {
+    while(ESP_OK != wifi_scan_connect(app->wifi_creds)) {
+        if (app->loop_while_connecting_func) app->loop_while_connecting_func(app);
         ESP_LOGI(TAG, "WIFI connection failed. retry...\n");   
     }
     ESP_LOGI(TAG, "WIFI is now connected.\n"); 
 }
 
-void wifi_connection_keep_alive(nvs_handle_t handle, wifi_creds_t creds, wifi_app_loop_func_t loop) {
-    if (wifi_disconnected) wifi_connection_establish(handle, creds, loop);
+void wifi_connection_keep_alive(wifi_app_t* app) {
+    if (wifi_disconnected) wifi_connection_establish(app);
 }
 
 
-bool wifi_app_exited = false;
 
-void wifi_app_run(
-    nvs_handle_t handle, 
-    wifi_creds_t creds, 
-    wifi_app_loop_func_t loop_while_connecting, 
-    wifi_app_loop_func_t loop_with_connection
-) {
+void wifi_app_run(wifi_app_t* app) {
     wifi_init();
 
-    wifi_connection_establish(handle, creds, loop_while_connecting);
+    wifi_connection_establish(app);
 
-    while(!wifi_app_exited) {
-        wifi_connection_keep_alive(handle, creds, loop_while_connecting);
-        if (loop_with_connection) loop_with_connection(handle, creds);
+    while(!app->exited) {
+        wifi_connection_keep_alive(app);
+        if (app->loop_with_connection_func) app->loop_with_connection_func(app);
     }
     ESP_LOGI(TAG, "\nOK, LEAVING...");
 }
@@ -648,7 +654,8 @@ mad12345
 // TODO: Unique code for each device. Should be changed before flash!
 #define WIFI_APP_SETTINGS_KEY "KF4GTX9"
 
-void wifi_app_settings(nvs_handle_t handle, wifi_app_settings_func_t settings) {
+
+void wifi_app_settings(wifi_app_t* app) {
     ESP_ERROR_CHECK( serial_install(UART_NUM_0, ESP_LINE_ENDINGS_CR, ESP_LINE_ENDINGS_CRLF) );
 
     printf("100 KEY\n");
@@ -656,8 +663,7 @@ void wifi_app_settings(nvs_handle_t handle, wifi_app_settings_func_t settings) {
     if (!strcmp(key, WIFI_APP_SETTINGS_KEY)) {
         free(key);
 
-        wifi_creds_t creds;
-        wifi_creds_clear(creds);
+        wifi_creds_clear(app->wifi_creds);
 
         for (int i=1; i<=WIFI_CREDENTIALS; i++) {
             printf("200 OK\n");
@@ -668,17 +674,17 @@ void wifi_app_settings(nvs_handle_t handle, wifi_app_settings_func_t settings) {
 
             printf("100 PSWD %d/%d:\n", WIFI_CREDENTIALS, i);
             char* pswd = serial_readln();
-            WIFI_CREDS_SET(creds, i, ssid, pswd);
+            WIFI_CREDS_SET(app->wifi_creds, i, ssid, pswd);
             free(ssid);
             free(pswd);            
         }
 
-        esp_err_t err = wifi_creds_save(handle, creds);
+        esp_err_t err = wifi_creds_save(app);
         ESP_OK == err ?             
             printf("200 OK Credentials are saved.\n") :
             printf("300 ERROR Saving credential error: %s\n", esp_err_to_name(err));
 
-        if (settings) settings(handle);
+        if (app->ext_settings_func) app->ext_settings_func(app);
     } else {
         free(key);
         printf("300 ERROR\n");
@@ -689,39 +695,29 @@ void wifi_app_settings(nvs_handle_t handle, wifi_app_settings_func_t settings) {
 
 // --------------
 
-void wifi_app_main(
-    const char* namespace,
-    wifi_app_settings_func_t settings_func,
-    wifi_app_loop_func_t loop_while_connecting,
-    wifi_app_loop_func_t loop_with_connection
-) {
+
+
+void wifi_app_main(wifi_app_t* app) {
     flash_init();
 
     // NVS Open
-    nvs_handle_t handle;
-    ESP_ERROR_CHECK( nvs_open(namespace, NVS_READWRITE, &handle) );
+    ESP_ERROR_CHECK( nvs_open(app->namespace, NVS_READWRITE, &app->nvs_handle) );
     
-    wifi_creds_t creds;
-    int mode = wifi_app_get_mode();
-    switch (mode) {
+    app->mode = wifi_app_get_mode();
+    switch (app->mode) {
         case WIFI_APP_MODE_SETTING:
-            wifi_app_settings(handle, settings_func);
+            wifi_app_settings(app);
             break;
         case WIFI_APP_MODE_RUN:
-            ESP_ERROR_CHECK( wifi_creds_load(handle, creds) );
-            wifi_app_run(
-                handle, 
-                creds, 
-                loop_while_connecting, 
-                loop_with_connection
-            );
+            ESP_ERROR_CHECK( wifi_creds_load(app) );
+            wifi_app_run(app);
             break;
         default:
-            ESP_LOGE(TAG, "Incorrect Wifi App Mode: %d", mode);
+            ESP_LOGE(TAG, "Incorrect Wifi App Mode: %d", app->mode);
     }
 
     // NVS Close
-    nvs_close(handle);
+    nvs_close(app->nvs_handle);
 }
 
 // ---------------------------------------------------------------
@@ -746,10 +742,11 @@ esp_err_t wscli_app_host_load(nvs_handle_t handle, char* host, size_t length) {
     return err;
 }
 
-void wscli_app_settings(nvs_handle_t handle) {
+void wscli_app_settings(void* arg) {
+    wifi_app_t* app = (wifi_app_t*)arg;
     printf("100 HOST:\n");
     char* host = serial_readln();
-    esp_err_t err = wscli_app_host_save(handle, host);
+    esp_err_t err = wscli_app_host_save(app->nvs_handle, host);
     ESP_OK == err ?             
         printf("200 OK\n") :
         printf("300 ERROR - %s\n", esp_err_to_name(err));
@@ -776,13 +773,15 @@ void wscli_app_settings(nvs_handle_t handle) {
 // #define WIFI_APP_STAT_WEBSCOKECT_DATA          21
 // #define WIFI_APP_STAT_WEBSCOKECT_ERROR         22
 
-int wifi_app_loop_status = WIFI_APP_STAT_WIFI_STARTED;
 
-void wifi_app_loop_while_connecting(nvs_handle_t handle, wifi_creds_t creds) {
-    switch (wifi_app_loop_status) {
+
+void wifi_app_loop_while_connecting(void* arg) {
+    wifi_app_t* app = (wifi_app_t*)arg;
+    
+    switch (app->wifi_loop_status) {
         case WIFI_APP_STAT_WIFI_STARTED:
             ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_STARTED");
-            wifi_app_loop_status = WIFI_APP_STAT_WIFI_CONNECTING;
+            app->wifi_loop_status = WIFI_APP_STAT_WIFI_CONNECTING;
             break;
         case WIFI_APP_STAT_WIFI_CONNECTING:
             ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_CONNECTING");
@@ -791,11 +790,11 @@ void wifi_app_loop_while_connecting(nvs_handle_t handle, wifi_creds_t creds) {
             break;
         case WIFI_APP_STAT_WIFI_CONNECTED:
             ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_CONNECTED");
-            wifi_app_loop_status = WIFI_APP_STAT_WIFI_DISCONNECTED;
+            app->wifi_loop_status = WIFI_APP_STAT_WIFI_DISCONNECTED;
             break;
         case WIFI_APP_STAT_WIFI_DISCONNECTED:
             ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_DISCONNECTED");
-            wifi_app_loop_status = WIFI_APP_STAT_WIFI_RECONNECTING;
+            app->wifi_loop_status = WIFI_APP_STAT_WIFI_RECONNECTING;
             break;
         case WIFI_APP_STAT_WIFI_RECONNECTING:
             ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_RECONNECTING");
@@ -803,20 +802,22 @@ void wifi_app_loop_while_connecting(nvs_handle_t handle, wifi_creds_t creds) {
             delay(1000);
             break;
         default:
-            ESP_LOGE(TAG, "wifi_app_loop_status error (wifi_app_loop_while_connecting): %d", wifi_app_loop_status);
+            ESP_LOGE(TAG, "app->wifi_loop_status error (wifi_app_loop_while_connecting): %d", app->wifi_loop_status);
             // TODO error
     }
 }
 
-void wifi_app_loop_with_connection(nvs_handle_t handle, wifi_creds_t creds) {
-    switch (wifi_app_loop_status) {
+void wifi_app_loop_with_connection(void* arg) {
+    wifi_app_t* app = (wifi_app_t*)arg;
+
+    switch (app->wifi_loop_status) {
         case WIFI_APP_STAT_WIFI_STARTED:
             ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_STARTED");
-            wifi_app_loop_status = WIFI_APP_STAT_WIFI_CONNECTING;
+            app->wifi_loop_status = WIFI_APP_STAT_WIFI_CONNECTING;
             break;
         case WIFI_APP_STAT_WIFI_CONNECTING:
             ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_CONNECTING");
-            wifi_app_loop_status = WIFI_APP_STAT_WIFI_CONNECTED;
+            app->wifi_loop_status = WIFI_APP_STAT_WIFI_CONNECTED;
             break;
         case WIFI_APP_STAT_WIFI_CONNECTED:
             ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_CONNECTED");
@@ -825,7 +826,7 @@ void wifi_app_loop_with_connection(nvs_handle_t handle, wifi_creds_t creds) {
             break;
         case WIFI_APP_STAT_WIFI_RECONNECTING:
             ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_RECONNECTING");
-            wifi_app_loop_status = WIFI_APP_STAT_WIFI_RECONNECTED;
+            app->wifi_loop_status = WIFI_APP_STAT_WIFI_RECONNECTED;
             break;
         case WIFI_APP_STAT_WIFI_RECONNECTED:
             ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_RECONNECTED");
@@ -833,7 +834,7 @@ void wifi_app_loop_with_connection(nvs_handle_t handle, wifi_creds_t creds) {
                 delay(1000);
             break;
         default:
-            ESP_LOGE(TAG, "wifi_app_loop_status error (wifi_app_loop_with_connection): %d", wifi_app_loop_status);
+            ESP_LOGE(TAG, "app->wifi_loop_status error (wifi_app_loop_with_connection): %d", app->wifi_loop_status);
             // TODO error
     }
 }
@@ -842,17 +843,21 @@ void wifi_app_loop_with_connection(nvs_handle_t handle, wifi_creds_t creds) {
 
 // -----------
 
+
 void app_main(void)
 {
     //esp_log_level_set("*", ESP_LOG_NONE);
 
-    wifi_app_main(
-        CAMSYS_NAMESPACE,
-        wscli_app_settings,
-        wifi_app_loop_while_connecting,
-        wifi_app_loop_with_connection
-        // TODO: pass more function to handle wifi events
-    );
+    wifi_app_t app;
+    app.namespace = CAMSYS_NAMESPACE;
+    app.wifi_loop_status = WIFI_APP_STAT_WIFI_STARTED;
+    app.exited = false; 
+    app.ext_settings_func = wscli_app_settings;
+    app.loop_while_connecting_func = wifi_app_loop_while_connecting;
+    app.loop_with_connection_func = wifi_app_loop_with_connection;
+    // TODO: pass more function to handle wifi events
+
+    wifi_app_main(&app);
 
     fflush(stdout);
     delay(1000);
