@@ -4,16 +4,19 @@
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
+#include "freertos/semphr.h"
+#include "freertos/event_groups.h"
 #include "esp_wifi.h"
 #include "esp_log.h"
 #include "esp_event.h"
 #include "esp_system.h"
+#include "esp_vfs_common.h"
+#include "esp_vfs_dev.h"
+#include "esp_websocket_client.h"
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "hal/uart_types.h"
-#include "esp_vfs_common.h"
 #include "driver/uart.h"
-#include "esp_vfs_dev.h"
 #include "driver/sdmmc_types.h"
 #include "driver/sdspi_host.h"
 
@@ -163,22 +166,12 @@ sdcard_t sdcard = {NULL, 0};
 
 esp_err_t sdcard_init(sdcard_mount_func_t mounter, bool auto_format, int max_files, size_t alloc_unit_size) {
     esp_err_t ret = ESP_OK;
-    // Options for mounting the filesystem.
-    // If format_if_mount_failed is set to true, SD card will be partitioned and
-    // formatted in case when mounting fails.
-    // struct mount_config_s {
-    //     bool format_if_mount_failed;
-    //     int max_files;
-    //     size_t allocation_unit_size;
-    // } mount_config
     sdcard_mount_config_t mount_config;
     mount_config.format_if_mount_failed = auto_format;
     mount_config.max_files = max_files;
     mount_config.allocation_unit_size = alloc_unit_size;
-    //};
     
     const char mount_point[] = SDCARD_MOUNT_POINT;
-    // ESP_LOGI("sdcard", "Initializing SD card");
 
     // Use settings defined above to initialize SD card and mount FAT filesystem.
     // Note: esp_vfs_fat_sdmmc/sdspi_mount is all-in-one convenience functions.
@@ -206,8 +199,6 @@ esp_err_t sdcard_init(sdcard_mount_func_t mounter, bool auto_format, int max_fil
 
     ret = esp_vfs_fat_sdmmc_mount(mount_point, &host, &slot_config, &mount_config, &sdcard.card);
 #else
-    // ESP_LOGI("sdcard", "Using SPI peripheral");
-
     sdmmc_host_t host = SDSPI_HOST_DEFAULT();
     spi_bus_config_t bus_cfg = {
         .mosi_io_num = SDCARD_PIN_NUM_MOSI,
@@ -219,7 +210,7 @@ esp_err_t sdcard_init(sdcard_mount_func_t mounter, bool auto_format, int max_fil
     };
     ret = spi_bus_initialize(host.slot, &bus_cfg, SDCARD_SPI_DMA_CHAN);
     if (ret != ESP_OK) {
-        // ESP_LOGE("sdcard", "Failed to initialize bus.");
+        ESP_LOGE(TAG, "Failed to initialize sdcard bus.");
         sdcard.slot = host.slot;
         return ret;
     }
@@ -235,11 +226,11 @@ esp_err_t sdcard_init(sdcard_mount_func_t mounter, bool auto_format, int max_fil
 
     if (ret != ESP_OK) {
         if (ret == ESP_FAIL) {
-            // ESP_LOGE("sdcard", "Failed to mount filesystem. "
-            //     "If you want the card to be formatted, set the EXAMPLE_FORMAT_IF_MOUNT_FAILED menuconfig option.");
+            ESP_LOGE("sdcard", "Failed to mount filesystem. "
+                /*"If you want the card to be formatted, set the EXAMPLE_FORMAT_IF_MOUNT_FAILED menuconfig option."*/);
         } else {
-            // ESP_LOGE("sdcard", "Failed to initialize the card (%s). "
-            //     "Make sure SD card lines have pull-up resistors in place.", esp_err_to_name(ret));
+            ESP_LOGE("sdcard", "Failed to initialize the card (%s). "
+                /*"Make sure SD card lines have pull-up resistors in place."*/, esp_err_to_name(ret));
         }
         sdcard.slot = host.slot;
         return ret;
@@ -255,7 +246,6 @@ esp_err_t sdcard_init(sdcard_mount_func_t mounter, bool auto_format, int max_fil
 esp_err_t sdcard_close(sdcard_unmount_func_t unmounter) {
     // All done, unmount partition and disable SDMMC or SPI peripheral
     esp_err_t err_vfs = unmounter(SDCARD_MOUNT_POINT, sdcard.card);
-    // ESP_LOGE("sdcard", "Card unmounted");
     esp_err_t err_spi = ESP_OK;
 #ifdef SDCARD_USE_SPI_MODE
     //deinitialize the bus after all devices are removed
@@ -302,12 +292,20 @@ char* strncpy_offs(char* dest, size_t offs, const char* src, size_t max) {
 typedef char wifi_creds_t[WIFI_CREDS_SIZE];
 
 
-typedef void (*wifi_app_cb_func_t)(void* app);
+typedef void (*app_cb_func_t)(void* app);
+typedef void (*websock_app_cb_func_t)(void* app, esp_websocket_event_data_t* data);
 
 
 struct wscli_app_s {
-    wifi_app_cb_func_t settings_func;
-    wifi_app_cb_func_t loop_func;
+    app_cb_func_t settings_func;
+    app_cb_func_t loop_func;
+    app_cb_func_t on_wifi_connected;
+    app_cb_func_t on_wifi_disconnected;
+    app_cb_func_t on_websock_connected;
+    app_cb_func_t on_websock_disconnected;
+    websock_app_cb_func_t on_websock_data;
+    app_cb_func_t on_websock_error;
+    app_cb_func_t on_websock_loop;
 };
 
 typedef struct wscli_app_s wscli_app_t;
@@ -317,8 +315,6 @@ struct wifi_app_s {
     nvs_handle_t nvs_handle;
     wifi_creds_t wifi_creds;
     int mode;
-    int wifi_loop_status;
-    bool wifi_loop_error;
     bool exited;
     wscli_app_t* ext;
 };
@@ -427,7 +423,6 @@ uint16_t wifi_scan(wifi_scan_list_t ap_info) {
     return ap_count;
 }
 
-
 #define WIFI_CONNECT_MAXIMUM_RETRY  5
 
 /* The event group allows multiple bits for each event, but we only care about two events:
@@ -441,11 +436,11 @@ static EventGroupHandle_t wifi_event_group;
 
 static int wifi_retry_num = 0;
 bool wifi_disconnected = true;
+bool wifi_disconnected_prev = true;
 
 static void wifi_event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data)
 {
-    ESP_LOGI(TAG, "WIFI EVENT:%d", event_id);
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
@@ -457,10 +452,10 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
             wifi_retry_num = 0;
             xEventGroupSetBits(wifi_event_group, WIFI_FAIL_BIT);
         }
-        ESP_LOGI(TAG,"connect to the AP fail");
+        ESP_LOGE(TAG,"connect to the AP fail");
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-        ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
+        // ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+        // ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
         wifi_retry_num = 0;
         wifi_disconnected = false;
         xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
@@ -473,7 +468,6 @@ esp_event_handler_instance_t wifi_handle_instance_disconnect;
 static void wifi_disconnect_event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data) 
 {
-    ESP_LOGI(TAG, "WIFI DISCONNECT EVENT HANDLER:%d, reconnect...", event_id);
     ESP_ERROR_CHECK(
         esp_event_handler_instance_unregister(
             WIFI_EVENT, 
@@ -530,8 +524,6 @@ esp_err_t wifi_connect(const char* ssid, const char* pswd) {
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config) );
     ESP_ERROR_CHECK(esp_wifi_start() );
 
-    ESP_LOGI(TAG, "wifi_init_sta finished.");
-
     /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
      * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
     EventBits_t bits = xEventGroupWaitBits(wifi_event_group,
@@ -543,21 +535,24 @@ esp_err_t wifi_connect(const char* ssid, const char* pswd) {
     /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
      * happened. */
     if (bits & WIFI_CONNECTED_BIT) {
-        ESP_LOGI(TAG, "connected to ap SSID:%s password:%s",
-                 ssid, pswd);
+        // ESP_LOGI(TAG, "connected to ap SSID:%s password:%s",
+        //          ssid, pswd);
     } else if (bits & WIFI_FAIL_BIT) {
-        ESP_LOGI(TAG, "Failed to connect to SSID:%s, password:%s",
-                 ssid, pswd);
+        // ESP_LOGI(TAG, "Failed to connect to SSID:%s, password:%s",
+        //          ssid, pswd);
         ret = ESP_ERR_WIFI_NOT_CONNECT;
     } else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
         ret = ESP_FAIL;
+        esp_restart();
     }
 
     /* The event will not be processed after unregister */
     ESP_ERROR_CHECK(esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, instance_got_ip));
     ESP_ERROR_CHECK(esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, instance_any_id));
     vEventGroupDelete(wifi_event_group);
+
+    if (ret != ESP_OK) ESP_ERROR_CHECK( esp_wifi_stop() );
     return ret;
 }
 
@@ -568,21 +563,10 @@ esp_err_t wifi_scan_connect(wifi_creds_t creds) {
     uint16_t ap_count = wifi_scan(ap_info);
 
     for (int i = 0; (i < WIFI_SCAN_LIST_SIZE) && (i < ap_count); i++) {
-        ESP_LOGI(TAG, "SSID \t\t%s", ap_info[i].ssid);
-        // ESP_LOGI(TAG, "RSSI \t\t%d", ap_info[i].rssi);
-        // //print_auth_mode(ap_info[i].authmode);
-        // if (ap_info[i].authmode != WIFI_AUTH_WEP) {
-        //     //print_cipher_type(ap_info[i].pairwise_cipher, ap_info[i].group_cipher);
-        // }
-        // ESP_LOGI(TAG, "Channel \t\t%d\n", ap_info[i].primary);
-
         for (int j=0; j<WIFI_CREDENTIALS; j++) {
+            // is ssid match?
             if (WIFI_CREDS_GET_SSID(creds, j)[0] && !strcmp(WIFI_CREDS_GET_SSID(creds, j), (char*)ap_info[i].ssid)) {
-                ESP_LOGI(TAG, "cred found at (%d):'%s':'%s' => '%s'\n", i, 
-                    WIFI_CREDS_GET_SSID(creds, j), 
-                    WIFI_CREDS_GET_PSWD(creds, j), 
-                    wifi_creds_get_pswd(creds,WIFI_CREDS_GET_SSID(creds, j))
-                );
+                // wifi connected?
                 if (ESP_OK == wifi_connect(WIFI_CREDS_GET_SSID(creds, j), WIFI_CREDS_GET_PSWD(creds, j))) return ESP_OK;
             }
         }
@@ -594,102 +578,13 @@ esp_err_t wifi_scan_connect(wifi_creds_t creds) {
 // WIFI CLIENT APP (loops)
 // ---------------------------------------------------------------
 
-#define WIFI_APP_STAT_WIFI_STARTED              1
-#define WIFI_APP_STAT_WIFI_CONNECTING           2
-#define WIFI_APP_STAT_WIFI_CONNECTED            3
-#define WIFI_APP_STAT_WIFI_DISCONNECTED         4
-#define WIFI_APP_STAT_WIFI_RECONNECTING         5
-#define WIFI_APP_STAT_WIFI_RECONNECTED          6
-
-// #define WIFI_APP_STAT_WEBSCOKECT_STARTED       11 // TODO..
-// #define WIFI_APP_STAT_WEBSCOKECT_CONNECTING    12
-// #define WIFI_APP_STAT_WEBSCOKECT_CONNECTED     13
-// #define WIFI_APP_STAT_WEBSCOKECT_DISCONNECTED  14
-// #define WIFI_APP_STAT_WEBSCOKECT_RECONNECTING  15
-// #define WIFI_APP_STAT_WEBSCOKECT_RECONNECTED   16
-// #define WIFI_APP_STAT_WEBSCOKECT_DATA          21
-// #define WIFI_APP_STAT_WEBSCOKECT_ERROR         22
-
-
-
-void wifi_app_loop_while_connecting(wifi_app_t* app) {    
-    switch (app->wifi_loop_status) {
-        case WIFI_APP_STAT_WIFI_STARTED:
-            // ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_STARTED");
-            app->wifi_loop_status = WIFI_APP_STAT_WIFI_CONNECTING;
-            break;
-        case WIFI_APP_STAT_WIFI_CONNECTING:
-            // ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_CONNECTING");
-            // todo callback loop
-            // delay(1000);
-            break;
-        case WIFI_APP_STAT_WIFI_CONNECTED:
-            // ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_CONNECTED");
-            app->wifi_loop_status = WIFI_APP_STAT_WIFI_DISCONNECTED;
-            break;
-        case WIFI_APP_STAT_WIFI_DISCONNECTED:
-            // ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_DISCONNECTED");
-            app->wifi_loop_status = WIFI_APP_STAT_WIFI_RECONNECTING;
-            break;
-        case WIFI_APP_STAT_WIFI_RECONNECTING:
-            // ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_RECONNECTING");
-            // todo callback loop
-            // delay(1000);
-            break;
-        default:
-            app->wifi_loop_error = true;
-            ESP_LOGE(TAG, "wifi loop error while connecting: %d", app->wifi_loop_status);
-            // TODO error
-    }
-    app->ext->loop_func(app);
-}
-
-void wifi_app_loop_with_connection(wifi_app_t* app) {
-    switch (app->wifi_loop_status) {
-        case WIFI_APP_STAT_WIFI_STARTED:
-            // ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_STARTED");
-            app->wifi_loop_status = WIFI_APP_STAT_WIFI_CONNECTING;
-            break;
-        case WIFI_APP_STAT_WIFI_CONNECTING:
-            // ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_CONNECTING");
-            app->wifi_loop_status = WIFI_APP_STAT_WIFI_CONNECTED;
-            break;
-        case WIFI_APP_STAT_WIFI_CONNECTED:
-            // ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_CONNECTED");
-            // todo callback loop
-            // delay(1000);
-            break;
-        case WIFI_APP_STAT_WIFI_RECONNECTING:
-            // ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_RECONNECTING");
-            app->wifi_loop_status = WIFI_APP_STAT_WIFI_RECONNECTED;
-            break;
-        case WIFI_APP_STAT_WIFI_RECONNECTED:
-            // ESP_LOGI(TAG, "WIFI_APP_STAT_WIFI_RECONNECTED");
-            // todo callback loop
-            // delay(1000);
-            break;
-        default:
-            app->wifi_loop_error = true;
-            ESP_LOGE(TAG, "wifi loop error with connection: %d", app->wifi_loop_status);
-            // TODO error
-    }
-    app->ext->loop_func(app);
-}
-// ------------
-
 void wifi_connection_establish(wifi_app_t* app) {
-    while(ESP_OK != wifi_scan_connect(app->wifi_creds)) {
-        wifi_app_loop_with_connection(app);
-        ESP_LOGI(TAG, "WIFI connection failed. retry...\n");   
-    }
-    ESP_LOGI(TAG, "WIFI is now connected.\n"); 
+    while(ESP_OK != wifi_scan_connect(app->wifi_creds)) app->ext->loop_func(app);
 }
 
 void wifi_connection_keep_alive(wifi_app_t* app) {
     if (wifi_disconnected) wifi_connection_establish(app);
 }
-
-
 
 void wifi_app_run(wifi_app_t* app) {
     wifi_init();
@@ -698,9 +593,8 @@ void wifi_app_run(wifi_app_t* app) {
 
     while(!app->exited) {
         wifi_connection_keep_alive(app);
-        wifi_app_loop_with_connection(app);
+        app->ext->loop_func(app);
     }
-    ESP_LOGI(TAG, "\nOK, LEAVING...");
 }
 
 #define WIFI_APP_MODE_SETTING 0
@@ -714,21 +608,22 @@ int wifi_app_get_mode() {
 // --------------
 
 /*
+An example setup:
 
 100 KEY
 KF4GTX9
 200 OK
 100 SSID 10/1:
-apucika
+testwifi
 200 OK
 100 PSWD 10/1:
-mad12345
+password1
 200 OK
 100 SSID 10/2:
-apucika_EXT
+secondwifi
 200 OK
 100 PSWD 10/2:
-mad12345
+password2
 200 OK
 100 SSID 10/3:
 
@@ -806,6 +701,8 @@ void wifi_app_main(wifi_app_t* app) {
             break;
         default:
             ESP_LOGE(TAG, "Incorrect Wifi App Mode: %d", app->mode);
+            esp_restart();
+            break;
     }
 
     // NVS Close
@@ -849,32 +746,164 @@ void wscli_app_settings(void* arg) {
 // WEBSOCKET CLIENT APP (loop)
 // ---------------------------------------------------------------
 
-void wscli_app_loop(void* arg) {
-    wifi_app_t* app = arg;
-    ESP_LOGI(TAG, "loop..");
+#define WEBSOCK_STATUS_CONNECTED 1
+#define WEBSOCK_STATUS_DISCONNECTED 0
+
+#define NO_DATA_TIMEOUT_SEC 10
+esp_websocket_client_config_t websocket_cfg = {};
+static TimerHandle_t shutdown_signal_timer;
+static SemaphoreHandle_t shutdown_sema;
+esp_websocket_client_handle_t client;
+const char* wsuri = "ws://192.168.0.200";
+
+static void wscli_app_shutdown_signaler(TimerHandle_t xTimer)
+{
+    xSemaphoreGive(shutdown_sema);
 }
 
+static void wscli_app_websocket_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
+{
+    wifi_app_t* app = handler_args;
+    esp_websocket_event_data_t *data = (esp_websocket_event_data_t *)event_data;
+    switch (event_id) {
+    case WEBSOCKET_EVENT_CONNECTED:
+        if (app->ext->on_websock_connected) (app->ext->on_websock_connected)(app);
+        break;
+    case WEBSOCKET_EVENT_DISCONNECTED:
+        if (app->ext->on_websock_disconnected) (app->ext->on_websock_disconnected)(app);
+        break;
+    case WEBSOCKET_EVENT_DATA:
+        xTimerReset(shutdown_signal_timer, portMAX_DELAY);
+        if (app->ext->on_websock_data) (app->ext->on_websock_data)(app, data);
+        break;
+    case WEBSOCKET_EVENT_ERROR:
+        if (app->ext->on_websock_error) (app->ext->on_websock_error)(app);
+        break;
+    default:
+        ESP_LOGE(TAG, "Websocket event unhandled: %d", event_id);
+        esp_restart();
+        break;
+    }
+}
+
+void wscli_app_websocket_start(wifi_app_t* app) {
+    
+    memset(&websocket_cfg, 0, sizeof(websocket_cfg));
+
+    shutdown_signal_timer = xTimerCreate("Websocket shutdown timer", NO_DATA_TIMEOUT_SEC * 1000 / portTICK_PERIOD_MS,
+                                         pdFALSE, NULL, wscli_app_shutdown_signaler);
+    shutdown_sema = xSemaphoreCreateBinary();
+
+    //ESP_ERROR_CHECK_WITHOUT_ABORT( wscli_app_host_load(app->nvs_handle, wsuri, WSURI_LENGTH_MAX) );
+    websocket_cfg.uri = wsuri;
+    
+    ESP_LOGI(TAG, "Connecting to %s...", websocket_cfg.uri);
+
+    client = esp_websocket_client_init(&websocket_cfg);
+    ESP_ERROR_CHECK_WITHOUT_ABORT( esp_websocket_register_events(client, WEBSOCKET_EVENT_ANY, wscli_app_websocket_event_handler, (void *)app) );
+
+    ESP_ERROR_CHECK_WITHOUT_ABORT( esp_websocket_client_start(client) );
+    xTimerStart(shutdown_signal_timer, portMAX_DELAY);
+}
+
+void wscli_app_websocket_stop(wifi_app_t* app) {
+    xSemaphoreTake(shutdown_sema, portMAX_DELAY);
+    ESP_ERROR_CHECK_WITHOUT_ABORT( esp_websocket_client_stop(client) );
+    ESP_LOGI(TAG, "Websocket Stopped");
+    ESP_ERROR_CHECK_WITHOUT_ABORT( esp_websocket_client_destroy(client) );
+}
+
+
+
+void wscli_app_loop(void* arg) {
+    wifi_app_t* app = arg;
+    if (wifi_disconnected_prev != wifi_disconnected) {
+        ESP_LOGI(TAG, "WIFI STATUS CHANGED TO %s\n", wifi_disconnected ? "DESCONNECTED" : "CONNECTED");
+        if (wifi_disconnected) wscli_app_websocket_stop(app); 
+        else wscli_app_websocket_start(app);
+        wifi_disconnected_prev = wifi_disconnected;
+        if (wifi_disconnected && app->ext->on_wifi_disconnected) (app->ext->on_wifi_disconnected)(app);
+        else if (!wifi_disconnected && app->ext->on_wifi_connected) (app->ext->on_wifi_connected)(app);
+    } else {
+        ESP_LOGI(TAG, "WIFI STATUS IS %s\n", wifi_disconnected ? "DESCONNECTED" : "CONNECTED");
+        wifi_disconnected_prev = wifi_disconnected;
+        if(app->ext->on_websock_loop) (app->ext->on_websock_loop)(app);
+    }
+}
+
+// ------------------------------------------------------
+
+void wscli_app_on_wifi_connected(void* arg) {
+    wifi_app_t* app = arg;
+    ESP_LOGI(TAG, "----------- [WIFI CONNECTED] -------------");
+}
+
+void wscli_app_on_wifi_disconnected(void* arg) {
+    wifi_app_t* app = arg;
+    ESP_LOGI(TAG, "----------- [WIFI DISCONNECTED] -------------");
+}
+
+void wscli_app_on_websock_connected(void* arg) {
+    wifi_app_t* app = arg;
+    ESP_LOGI(TAG, "----------- [WEBSOCKET CONNECTED] -------------");
+}
+
+void wscli_app_on_websock_disconnected(void* arg) {
+    wifi_app_t* app = arg;
+    ESP_LOGI(TAG, "----------- [WEBSOCKET DISCONNECTED] -------------");
+}
+
+void wscli_app_on_websock_data(void* arg, esp_websocket_event_data_t* data) {
+    wifi_app_t* app = arg;
+    ESP_LOGI(TAG, "----------- [WEBSOCKET DATA] -------------");
+
+    ESP_LOGI(TAG, "WEBSOCKET_EVENT_DATA");
+    ESP_LOGI(TAG, "Received opcode=%d", data->op_code);
+    ESP_LOGW(TAG, "Received=%.*s", data->data_len, (char *)data->data_ptr);
+    ESP_LOGW(TAG, "Total payload length=%d, data_len=%d, current payload offset=%d\r\n", data->payload_len, data->data_len, data->payload_offset);
+
+}
+
+void wscli_app_on_websock_error(void* arg) {
+    wifi_app_t* app = arg;
+    ESP_LOGI(TAG, "----------- [WEBSOCKET ERROR] -------------");
+}
+
+void wscli_app_on_websock_loop(void* arg) {
+    wifi_app_t* app = arg;
+    ESP_LOGI(TAG, "----------- [WEBSOCKET LOOP] -------------");
+    delay(1000);
+}
+
+
+// ------------------------------------------------------
 
 void wscli_app_main(wscli_app_t* ext) {
     wifi_app_t app;
     app.namespace = CAMSYS_NAMESPACE;
-    app.wifi_loop_status = WIFI_APP_STAT_WIFI_STARTED;
     app.exited = false; 
-    app.wifi_loop_error = false;
     app.ext = ext;
 
     wifi_app_main(&app);
 }
 
+// -
 
 void app_main(void)
 {
     //esp_log_level_set("*", ESP_LOG_NONE);
 
-    wscli_app_t app;
-    app.settings_func = wscli_app_settings;
-    app.loop_func = wscli_app_loop;
-    wscli_app_main(&app);
+    wscli_app_t ext;
+    ext.settings_func = wscli_app_settings;
+    ext.loop_func = wscli_app_loop;
+    ext.on_wifi_connected = wscli_app_on_wifi_connected;
+    ext.on_wifi_disconnected = wscli_app_on_wifi_disconnected;
+    ext.on_websock_connected = wscli_app_on_websock_connected;
+    ext.on_websock_disconnected = wscli_app_on_websock_disconnected;
+    ext.on_websock_data = wscli_app_on_websock_data;
+    ext.on_websock_error = wscli_app_on_websock_error;
+    ext.on_websock_loop = wscli_app_on_websock_loop;
+    wscli_app_main(&ext);
 
     fflush(stdout);
     delay(1000);
