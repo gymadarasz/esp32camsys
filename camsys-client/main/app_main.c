@@ -566,31 +566,39 @@ esp_err_t wifi_scan_connect(wifi_creds_t creds) {
 }
 
 typedef void (*wifi_app_settings_func_t)(nvs_handle_t handle);
-typedef void (*wifi_app_loop_func_t)(void);
+typedef void (*wifi_app_loop_func_t)(
+    nvs_handle_t handle, 
+    wifi_creds_t creds
+);
 
-void wifi_connection_establish(wifi_creds_t creds, wifi_app_loop_func_t loop) {
+void wifi_connection_establish(nvs_handle_t handle, wifi_creds_t creds, wifi_app_loop_func_t loop) {
     while(ESP_OK != wifi_scan_connect(creds)) {
-        loop();
+        if (loop) loop(handle, creds);
         ESP_LOGI(TAG, "WIFI connection failed. retry...\n");   
     }
     ESP_LOGI(TAG, "WIFI is now connected.\n"); 
 }
 
-void wifi_connection_keep_alive(wifi_creds_t creds, wifi_app_loop_func_t loop) {
-    if (wifi_disconnected) wifi_connection_establish(creds, loop);
+void wifi_connection_keep_alive(nvs_handle_t handle, wifi_creds_t creds, wifi_app_loop_func_t loop) {
+    if (wifi_disconnected) wifi_connection_establish(handle, creds, loop);
 }
 
 
 bool wifi_app_exited = false;
 
-void wifi_app_run(wifi_creds_t creds, wifi_app_loop_func_t loop_while_connecting, wifi_app_loop_func_t loop_with_connection) {
+void wifi_app_run(
+    nvs_handle_t handle, 
+    wifi_creds_t creds, 
+    wifi_app_loop_func_t loop_while_connecting, 
+    wifi_app_loop_func_t loop_with_connection
+) {
     wifi_init();
 
-    wifi_connection_establish(creds, loop_while_connecting);
+    wifi_connection_establish(handle, creds, loop_while_connecting);
 
     while(!wifi_app_exited) {
-        wifi_connection_keep_alive(creds, loop_while_connecting);
-        loop_with_connection();
+        wifi_connection_keep_alive(handle, creds, loop_while_connecting);
+        if (loop_with_connection) loop_with_connection(handle, creds);
     }
     ESP_LOGI(TAG, "\nOK, LEAVING...");
 }
@@ -668,7 +676,7 @@ void wifi_app_settings(nvs_handle_t handle, wifi_app_settings_func_t settings) {
             printf("200 OK Credentials are saved.\n") :
             printf("300 ERROR Saving credential error: %s\n", esp_err_to_name(err));
 
-        settings(handle);
+        if (settings) settings(handle);
     } else {
         free(key);
         printf("300 ERROR\n");
@@ -677,8 +685,45 @@ void wifi_app_settings(nvs_handle_t handle, wifi_app_settings_func_t settings) {
     ESP_ERROR_CHECK( serial_uninstall(UART_NUM_0) );
 }
 
+// --------------
+
+void wifi_app_main(
+    const char* namespace,
+    wifi_app_settings_func_t settings_func,
+    wifi_app_loop_func_t loop_while_connecting,
+    wifi_app_loop_func_t loop_with_connection
+) {
+    flash_init();
+
+    // NVS Open
+    nvs_handle_t handle;
+    ESP_ERROR_CHECK( nvs_open(namespace, NVS_READWRITE, &handle) );
+    
+    wifi_creds_t creds;
+    int mode = wifi_app_get_mode();
+    switch (mode) {
+        case WIFI_APP_MODE_SETTING:
+            wifi_app_settings(handle, settings_func);
+            break;
+        case WIFI_APP_MODE_RUN:
+            ESP_ERROR_CHECK( wifi_creds_load(handle, creds) );
+            wifi_app_run(
+                handle, 
+                creds, 
+                loop_while_connecting, 
+                loop_with_connection
+            );
+            break;
+        default:
+            ESP_LOGE(TAG, "Incorrect Wifi App Mode: %d", mode);
+    }
+
+    // NVS Close
+    nvs_close(handle);
+}
+
 // ---------------------------------------------------------------
-// WEBSOCKET CLIENT APP (settings)
+// WIFI WEBSOCKET CLIENT APP (settings)
 // ---------------------------------------------------------------
 
 esp_err_t wscli_host_save(nvs_handle_t handle, const char* host) {
@@ -710,20 +755,88 @@ void wscli_app_settings(nvs_handle_t handle) {
 }
 
 // ---------------------------------------------------------------
-// WEBSOCKET CLIENT APP (loops)
+// WIFI WEBSOCKET CLIENT APP (loops)
 // ---------------------------------------------------------------
 
-void wscli_app_loop_while_connecting() {
-    ESP_LOGI(TAG, "App working when no wifi..\n");
-    printf("no wifi..\n");
-    delay(1000);
+#define WSCLI_APP_STAT_WIFI_STARTED              1
+#define WSCLI_APP_STAT_WIFI_CONNECTING           2
+#define WSCLI_APP_STAT_WIFI_CONNECTED            3
+#define WSCLI_APP_STAT_WIFI_DISCONNECTED         4
+#define WSCLI_APP_STAT_WIFI_RECONNECTING         5
+#define WSCLI_APP_STAT_WIFI_RECONNECTED          6
+
+#define WSCLI_APP_STAT_WEBSCOKECT_STARTED       11 // TODO..
+#define WSCLI_APP_STAT_WEBSCOKECT_CONNECTING    12
+#define WSCLI_APP_STAT_WEBSCOKECT_CONNECTED     13
+#define WSCLI_APP_STAT_WEBSCOKECT_DISCONNECTED  14
+#define WSCLI_APP_STAT_WEBSCOKECT_RECONNECTING  15
+#define WSCLI_APP_STAT_WEBSCOKECT_RECONNECTED   16
+#define WSCLI_APP_STAT_WEBSCOKECT_DATA          21
+#define WSCLI_APP_STAT_WEBSCOKECT_ERROR         22
+
+int wscli_app_loop_status = WSCLI_APP_STAT_WIFI_STARTED;
+
+void wscli_app_loop_while_connecting(nvs_handle_t handle, wifi_creds_t creds) {
+    switch (wscli_app_loop_status) {
+        case WSCLI_APP_STAT_WIFI_STARTED:
+            ESP_LOGI(TAG, "WSCLI_APP_STAT_WIFI_STARTED");
+            wscli_app_loop_status = WSCLI_APP_STAT_WIFI_CONNECTING;
+            break;
+        case WSCLI_APP_STAT_WIFI_CONNECTING:
+            ESP_LOGI(TAG, "WSCLI_APP_STAT_WIFI_CONNECTING");
+            // todo callback loop
+            delay(1000);
+            break;
+        case WSCLI_APP_STAT_WIFI_CONNECTED:
+            ESP_LOGI(TAG, "WSCLI_APP_STAT_WIFI_CONNECTED");
+            wscli_app_loop_status = WSCLI_APP_STAT_WIFI_DISCONNECTED;
+            break;
+        case WSCLI_APP_STAT_WIFI_DISCONNECTED:
+            ESP_LOGI(TAG, "WSCLI_APP_STAT_WIFI_DISCONNECTED");
+            wscli_app_loop_status = WSCLI_APP_STAT_WIFI_RECONNECTING;
+            break;
+        case WSCLI_APP_STAT_WIFI_RECONNECTING:
+            ESP_LOGI(TAG, "WSCLI_APP_STAT_WIFI_RECONNECTING");
+            // todo callback loop
+            delay(1000);
+            break;
+        default:
+            ESP_LOGE(TAG, "wscli_app_loop_status error (wscli_app_loop_while_connecting): %d", wscli_app_loop_status);
+            // TODO error
+    }
 }
 
-void wscli_app_loop_with_connection() {
-    ESP_LOGI(TAG, "App working when wifi connected..\n");
-    printf("has wifi..\n");
-    delay(1000);
+void wscli_app_loop_with_connection(nvs_handle_t handle, wifi_creds_t creds) {
+    switch (wscli_app_loop_status) {
+        case WSCLI_APP_STAT_WIFI_STARTED:
+            ESP_LOGI(TAG, "WSCLI_APP_STAT_WIFI_STARTED");
+            wscli_app_loop_status = WSCLI_APP_STAT_WIFI_CONNECTING;
+            break;
+        case WSCLI_APP_STAT_WIFI_CONNECTING:
+            ESP_LOGI(TAG, "WSCLI_APP_STAT_WIFI_CONNECTING");
+            wscli_app_loop_status = WSCLI_APP_STAT_WIFI_CONNECTED;
+            break;
+        case WSCLI_APP_STAT_WIFI_CONNECTED:
+            ESP_LOGI(TAG, "WSCLI_APP_STAT_WIFI_CONNECTED");
+            // todo callback loop
+            delay(1000);
+            break;
+        case WSCLI_APP_STAT_WIFI_RECONNECTING:
+            ESP_LOGI(TAG, "WSCLI_APP_STAT_WIFI_RECONNECTING");
+            wscli_app_loop_status = WSCLI_APP_STAT_WIFI_RECONNECTED;
+            break;
+        case WSCLI_APP_STAT_WIFI_RECONNECTED:
+            ESP_LOGI(TAG, "WSCLI_APP_STAT_WIFI_RECONNECTED");
+            // todo callback loop
+                delay(1000);
+            break;
+        default:
+            ESP_LOGE(TAG, "wscli_app_loop_status error (wscli_app_loop_with_connection): %d", wscli_app_loop_status);
+            // TODO error
+    }
 }
+
+// -----------
 
 // -----------
 
@@ -731,30 +844,12 @@ void app_main(void)
 {
     //esp_log_level_set("*", ESP_LOG_NONE);
 
-    flash_init();
-
-    // NVS Open
-    nvs_handle_t handle;
-    ESP_ERROR_CHECK( nvs_open(CAMSYS_NAMESPACE, NVS_READWRITE, &handle) );
-    
-    wifi_creds_t creds;
-    int mode = wifi_app_get_mode();
-    switch (mode) {
-        case WIFI_APP_MODE_SETTING:
-            wifi_app_settings(handle, wscli_app_settings);
-            break;
-        case WIFI_APP_MODE_RUN:
-
-            ESP_ERROR_CHECK( wifi_creds_load(handle, creds) );
-
-            wifi_app_run(creds, wscli_app_loop_while_connecting, wscli_app_loop_with_connection);
-            break;
-        default:
-            ESP_LOGE(TAG, "Incorrect Wifi App Mode: %d", mode);
-    }
-
-    // NVS Close
-    nvs_close(handle);
+    wifi_app_main(
+        CAMSYS_NAMESPACE,
+        wscli_app_settings,
+        wscli_app_loop_while_connecting,
+        wscli_app_loop_with_connection
+    );
 
     fflush(stdout);
     delay(1000);
