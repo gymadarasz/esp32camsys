@@ -65,6 +65,7 @@ void delay(long ms) {
     vTaskDelay(ms / portTICK_RATE_MS);
 }
 
+/*
 // ---------------------------------------------------------------
 // ERROR
 // ---------------------------------------------------------------
@@ -87,6 +88,7 @@ void errorlnf(int line, const char* fmt, ...) {
     delay(1000);
     esp_restart();
 }
+*/
 
 // ---------------------------------------------------------------
 // SERIAL READ
@@ -146,7 +148,7 @@ char* serial_readln() {
 #define SDCARD_USE_SPI_MODE
 #endif // SDCARD_USE_SPI_MODE
 // on ESP32-S2, DMA channel must be the same as host id
-#define SDCARD_SPI_DMA_CHAN    host.slot
+#define SDCARD_SPI_DMA_CHAN    sdcard_host.slot
 #endif //SDCARD_TARGET_ESP32S2
 
 // DMA channel to be used by the SPI peripheral
@@ -169,18 +171,20 @@ char* serial_readln() {
 #endif //SDCARD_USE_SPI_MODE
 
 
-const char mount_point[] = SDCARD_MOUNT_POINT;
-sdmmc_card_t* card;
+const char sdcard_mount_point[] = SDCARD_MOUNT_POINT;
+sdmmc_card_t* sdcard;
 
 #ifndef SDCARD_USE_SPI_MODE
-sdmmc_host_t host = SDMMC_HOST_DEFAULT();
+sdmmc_host_t sdcard_host = SDMMC_HOST_DEFAULT();
 #else
-sdmmc_host_t host = SDSPI_HOST_DEFAULT();
+sdmmc_host_t sdcard_host = SDSPI_HOST_DEFAULT();
 #endif //SDCARD_USE_SPI_MODE
 
-void sdcard_init(void)
+bool sdcard_initialized = false;
+
+esp_err_t sdcard_init()
 {
-    esp_err_t ret;
+    esp_err_t ret = ESP_OK;
     // Options for mounting the filesystem.
     // If format_if_mount_failed is set to true, SD card will be partitioned and
     // formatted in case when mounting fails.
@@ -214,7 +218,7 @@ void sdcard_init(void)
     gpio_set_pull_mode(12, GPIO_PULLUP_ONLY);   // D2, needed in 4-line mode only
     gpio_set_pull_mode(13, GPIO_PULLUP_ONLY);   // D3, needed in 4- and 1-line modes
 
-    ret = esp_vfs_fat_sdmmc_mount(mount_point, &host, &slot_config, &mount_config, &card);
+    ret = esp_vfs_fat_sdmmc_mount(sdcard_mount_point, &sdcard_host, &slot_config, &mount_config, &sdcard);
 #else
     ESP_LOGI(TAG, "Using SPI peripheral");
 
@@ -226,19 +230,19 @@ void sdcard_init(void)
         .quadhd_io_num = -1,
         .max_transfer_sz = 4000,
     };
-    ret = spi_bus_initialize(host.slot, &bus_cfg, SDCARD_SPI_DMA_CHAN);
+    ret = spi_bus_initialize(sdcard_host.slot, &bus_cfg, SDCARD_SPI_DMA_CHAN);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize bus.");
-        return;
+        return ret;
     }
 
     // This initializes the slot without card detect (CD) and write protect (WP) signals.
     // Modify slot_config.gpio_cd and slot_config.gpio_wp if your board has these signals.
     sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
     slot_config.gpio_cs = SDCARD_PIN_NUM_CS;
-    slot_config.host_id = host.slot;
+    slot_config.host_id = sdcard_host.slot;
 
-    ret = esp_vfs_fat_sdspi_mount(mount_point, &host, &slot_config, &mount_config, &card);
+    ret = esp_vfs_fat_sdspi_mount(sdcard_mount_point, &sdcard_host, &slot_config, &mount_config, &sdcard);
 #endif //SDCARD_USE_SPI_MODE
 
     if (ret != ESP_OK) {
@@ -249,11 +253,14 @@ void sdcard_init(void)
             ESP_LOGE(TAG, "Failed to initialize the card (%s). "
                 "Make sure SD card lines have pull-up resistors in place.", esp_err_to_name(ret));
         }
-        return;
+        return ret;
     }
 
     // Card has been initialized, print its properties
-    sdmmc_card_print_info(stdout, card);
+    sdmmc_card_print_info(stdout, sdcard);
+
+    sdcard_initialized = (ret == ESP_OK);
+    return ret;
 }
 
 void sdcard_test() {
@@ -265,7 +272,7 @@ void sdcard_test() {
         ESP_LOGE(TAG, "Failed to open file for writing");
         return;
     }
-    fprintf(f, "Hello %s!\n", card->cid.name);
+    fprintf(f, "Hello %s!\n", sdcard->cid.name);
     fclose(f);
     ESP_LOGI(TAG, "File written");
 
@@ -302,12 +309,13 @@ void sdcard_test() {
 }
 
 void sdcard_close() {
+    if (!sdcard_initialized) return;
     // All done, unmount partition and disable SDMMC or SPI peripheral
-    esp_vfs_fat_sdcard_unmount(mount_point, card);
+    esp_vfs_fat_sdcard_unmount(sdcard_mount_point, sdcard);
     ESP_LOGI(TAG, "Card unmounted");
 #ifdef SDCARD_USE_SPI_MODE
     //deinitialize the bus after all devices are removed
-    spi_bus_free(host.slot);
+    spi_bus_free(sdcard_host.slot);
 #endif
 }
 
@@ -340,10 +348,31 @@ char* strncpy_offs(char* dest, size_t offs, const char* src, size_t max) {
 #define CAMSYS_BY_MODE(camera, motion) if (mode) camera else motion
 
 struct camsys_camera_s {
-    
+    FILE* file;
 };
 
 typedef struct camsys_camera_s camsys_camera_t;
+
+void camera_recording_init(camsys_camera_t* camera) {
+    camera->file = NULL;
+}
+
+esp_err_t camera_recording_stop(camsys_camera_t* camera) {
+    if (fclose(camera->file)) return ESP_FAIL;
+    camera->file = NULL;
+    return ESP_OK;
+}
+
+esp_err_t camera_recording_start(camsys_camera_t* camera) {
+    if (camera->file && ESP_OK != camera_recording_stop(camera)) return ESP_FAIL;
+    
+    camera->file = fopen(SDCARD_MOUNT_POINT"/record", "ab");
+    if (!camera->file) {
+        ESP_LOGE(TAG, "file open error: %d", errno);
+        return ESP_FAIL;
+    }
+    return ESP_OK;    
+}
 
 struct camsys_motion_s {
     
@@ -573,9 +602,55 @@ static const char* CAMSYS_CAMERA_STREAM_PART = "Content-Type: image/jpeg\r\nCont
 
 wifi_app_t* _app = NULL;
 
-esp_err_t camsys_uri_camera_stream_httpd_handler(httpd_req_t* req) {
-    wifi_app_t* app = _app;
+bool camsys_fb_hold = false;
 
+camera_fb_t * camsys_fb_get(wifi_app_t* app) {
+    while(camsys_fb_hold);
+    camsys_fb_hold = true;
+    camera_fb_t * fb = esp_camera_fb_get();
+    if (fb && app->ext->sys->mode == CAMSYS_MODE_CAMERA && app->ext->sys->camera->file) {
+        size_t written = fwrite(fb, sizeof(camera_fb_t), sizeof(fb), app->ext->sys->camera->file);
+        if (written != sizeof(fb)) ESP_LOGE(TAG, "write error: written: %d != sizeof(fb): %d, error: %d", written, sizeof(fb), ferror(app->ext->sys->camera->file));
+        else {
+            written = fwrite(fb->buf, sizeof(uint8_t), fb->len, app->ext->sys->camera->file);
+            if (written != fb->len) ESP_LOGE(TAG, "write error: written: %d != fb->len: %d, error: %d", written, fb->len, ferror(app->ext->sys->camera->file));
+        }
+    }
+    return fb;
+}
+
+esp_err_t camsys_fb_return(camera_fb_t * fb) {
+    if(!camsys_fb_hold) return ESP_FAIL;
+    esp_camera_fb_return(fb);
+    camsys_fb_hold = false;
+    return ESP_OK;
+}
+
+bool camsys_check_secret(httpd_req_t* req) {
+    bool secret_ok = false;
+    if (!nvs_http_settings.secret || nvs_http_settings.secret[0] == '\0') return secret_ok;
+
+    /* Read URL query string length and allocate memory for length + 1,
+     * extra byte for null termination */
+    size_t buf_len = httpd_req_get_url_query_len(req) + 1;
+    if (buf_len > 1) {
+        char* buf = malloc(buf_len);
+        if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK) {
+            ESP_LOGI("camsys", "Found URL query"/*, buf*/);
+            char param[40];
+            /* Get value of expected key from query string */
+            if (httpd_query_key_value(buf, "secret", param, sizeof(param)) == ESP_OK) {
+                ESP_LOGI("camsys", "Found URL query parameter => secret"/*, param*/);
+                if (!strcmp(param, nvs_http_settings.secret)) secret_ok = true;
+            }
+        }
+        free(buf);
+    }
+    return true; // TODO: remove this line to validate secret parameter
+    return secret_ok;
+}
+
+esp_err_t camsys_camera_httpd_handler(wifi_app_t* app, httpd_req_t* req) {
     esp_err_t res = ESP_OK;
     camera_fb_t * fb = NULL;
     size_t _jpg_buf_len;
@@ -585,18 +660,17 @@ esp_err_t camsys_uri_camera_stream_httpd_handler(httpd_req_t* req) {
     res = httpd_resp_set_type(req, CAMSYS_CAMERA_STREAM_CONTENT_TYPE);
     if(res != ESP_OK) return res;
     
-    sdcard_init();
+    ESP_ERROR_CHECK_WITHOUT_ABORT( camera_recording_start(app->ext->sys->camera) ); // TODO: remove this to switch off recording autostart
+
     app->ext->sys->streaming = true;
+
     while(app->ext->sys->streaming) {
-        fb = esp_camera_fb_get();
+        fb = camsys_fb_get(app);
         if (!fb) {
-            ESP_LOGE("camsys", "Camera capture failed");
+            ESP_LOGE(TAG, "Camera capture failed");
             res = ESP_FAIL;
             break;
         }
-
-
-        sdcard_test();
 
         _jpg_buf_len = fb->len;
         _jpg_buf = fb->buf;
@@ -616,22 +690,42 @@ esp_err_t camsys_uri_camera_stream_httpd_handler(httpd_req_t* req) {
         if(fb->format != PIXFORMAT_JPEG){
             free(_jpg_buf);
         }
-        esp_camera_fb_return(fb);
-        if(res != ESP_OK){
+        if(res != ESP_OK || camsys_fb_return(fb) != ESP_OK){
+            if (res == ESP_OK) res = ESP_FAIL;
             break;
         }
         
     }
+    
+    ESP_ERROR_CHECK_WITHOUT_ABORT( camera_recording_stop(app->ext->sys->camera) );// TODO: remove this when recording autostart is switched off 
+    
     app->ext->sys->streaming = false;
 
-    sdcard_close();
+    return res;
+}
+
+esp_err_t camsys_camera_httpd_handler(wifi_app_t* app, httpd_req_t* req) {
+    esp_err_t res = ESP_OK;
+    // TODO capture a bmp
+    return res;
+}
+
+
+esp_err_t camsys_httpd_handler(httpd_req_t* req) {
+    if (!camsys_check_secret(req)) return ESP_FAIL;
+    wifi_app_t* app = _app;
+    CAMSYS_BY_APP_MODE(
+        camsys_camera_httpd_handler(app, req);,
+        camsys_motion_httpd_handler(app, req);
+    );
+
     return res;
 }
 
 static const httpd_uri_t camsys_uri_camera_stream = {
-    .uri       = "/stream",
+    .uri       = "/",
     .method    = HTTP_GET,
-    .handler   = camsys_uri_camera_stream_httpd_handler,
+    .handler   = camsys_httpd_handler,
     /* Let's pass response string in user
      * context to demonstrate it's usage */
     .user_ctx  = NULL
@@ -877,6 +971,7 @@ void wifi_app_run(wifi_app_t* app) {
     camera_httpd_server_init(app);
 
     // TODO may cam should be initialized here?
+    sdcard_init();
 
     wifi_connection_establish(app);
 
@@ -886,6 +981,8 @@ void wifi_app_run(wifi_app_t* app) {
         wifi_connection_keep_alive(app);
         app->ext->loop_func(app);
     }
+
+    sdcard_close();
 }
 
 #define WIFI_APP_MODE_SETTING 0
@@ -1007,7 +1104,7 @@ void wifi_app_main(wifi_app_t* app) {
             break;
         default:
             ESP_LOGE(TAG, "Incorrect Wifi App Mode: %d", app->mode);
-            esp_restart();
+            app->exited = true;
             break;
     }
 
@@ -1081,7 +1178,7 @@ static void wscli_app_websocket_event_handler(void *handler_args, esp_event_base
         break;
     default:
         ESP_LOGE(TAG, "Websocket event unhandled: %d", event_id);
-        esp_restart();
+        app->exited = true;
         break;
     }
 }
@@ -1192,10 +1289,10 @@ void wscli_app_on_websock_loop(void* arg) {
     // if (app->ext->sys->streaming) {
     //     camera_fb_t* fb = esp_camera_fb_get();
     //     if (fb) {
-    //         if (app->ext->sys->streaming && fb->len != esp_websocket_client_send_bin(app->ext->client, (char*)fb->buf, fb->len, portMAX_DELAY)) ESP_LOGE("camsys", "Image send failed");
+    //         if (app->ext->sys->streaming && fb->len != esp_websocket_client_send_bin(app->ext->client, (char*)fb->buf, fb->len, portMAX_DELAY)) ESP_LOGE(TAG, "Image send failed");
     //         if (fb->format != PIXFORMAT_JPEG) free(fb->buf);
     //         esp_camera_fb_return(fb);
-    //     } else ESP_LOGE("camsys", "Camera capture failed");
+    //     } else ESP_LOGE(TAG, "Camera capture failed");
     // }
 
 }
@@ -1250,6 +1347,7 @@ void rec_app_main() {
     sys.streaming = false;
 
     camsys_camera_t camera;
+    camera_recording_init(&camera);
 
     camsys_motion_t motion;
 
