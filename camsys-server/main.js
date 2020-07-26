@@ -20,34 +20,6 @@ function createWindow () {
   // Open the DevTools.
   mainWindow.webContents.openDevTools()
 
-  // mainWindow.webContents.executeJavaScript('myApp', true).then((result) => {
-  //   console.log(result)
-  //   result.prop = "blah";
-  //   mainWindow.webContents.executeJavaScript('myApp = ' + JSON.stringify(result))
-  // })
-  // class Index {
-  //   constructor() {
-  //     // const WebSocket = require('ws');
-
-  //     // const wss = new WebSocket.Server({ port: 8080 });
-      
-  //     // wss.on('connection', function connection(ws) {
-  //     //     ws.on('message', function incoming(message) {
-  //     //         console.log('received: %s', message);
-  //     //     });
-          
-  //     //     ws.send('something');
-  //     // });
-
-  //   }
-  // }
-  // new Index();
-
-  // const ipc = require('electron').ipcMain
-  //   // Event that return the arg in uppercase
-  //   ipc.on('uppercase', function (event, arg) {
-  //     event.returnValue = arg.toUpperCase()
-  //   })
 }
 
 // This method will be called when Electron has finished

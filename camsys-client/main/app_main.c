@@ -1410,13 +1410,9 @@ void camsys_app_main(camsys_t* sys)
 
 }
 
-
-void rec_app_main() {
+void app_main() {
     //esp_log_level_set("*", ESP_LOG_NONE);
 
-    // ESP_ERROR_CHECK(httpd_register_uri_handler(httpd_server, &uri_camera_stream));
-    // ESP_ERROR_CHECK(httpd_register_uri_handler(httpd_server, &uri_motion_stream));
-    
     camsys_t sys;
     sys.mode = CAMSYS_MODE_MOTION; // CAMSYS_MODE_CAMERA;
     sys.streaming = false;
@@ -1429,12 +1425,6 @@ void rec_app_main() {
     sys.camera = &camera;
     sys.motion = &motion;
     camsys_app_main(&sys);
-
-}
-
-void app_main() {
-    // TODO sdcard..
-    rec_app_main();
 
     fflush(stdout);
     delay(1000);

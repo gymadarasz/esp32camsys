@@ -2,57 +2,22 @@
 <html>
   <head>
     <meta charset="UTF-8">
-    <title>Hello World!</title>
-    <script>
-      // var myApp = {"prop":"foo"};
-    </script>
+    <title>CAMSYS</title>
+    <style>
+      .template {display: none;}
+    </style>
   </head>
   <body>
-    <h1>Hello World!</h1>
-    We are using Node.js <span id="node-version"></span>,
-    Chromium <span id="chrome-version"></span>,
-    and Electron <span id="electron-version"></span>.
-
-    <-- <div id="konsole">...</div> -->
-
-    <script>
-      // const ipc = require('electron').ipcRenderer
-      // const konsole = document.getElementById('konsole')
-
-      // // Functions
-      // let reply, message
-
-      // // First MSG
-      // reply = ipc.sendSync('uppercase', 'Hi, I\'m the first msg')
-      // message = `Uppercase message reply: ${reply}`
-      // document.getElementById('konsole').innerHTML = message
-
-      // // Second MSG
-      // reply = ipc.sendSync('uppercase', 'Hi, I\'m the second msg')
-      // message = `Uppercase message reply: ${reply}`
-      // document.getElementById('konsole').innerHTML = message
-
-
-      const WebSocket = require('ws');
-
-      const wss = new WebSocket.Server({ 
-        port: 8080,
-        // path: '/' + pathkey, // TODO: accept connection only on this URL
-        binaryType: 'fragments',
-        clientTracking: true,
-      });
-      //asd
-      wss.on('connection', function connection(ws) {
-        console.log("client connected", ws, wss);
-        ws.on('message', function incoming(message) {
-            console.log('received:', message);
-        });
-
-        ws.send('something');
-      });
-    </script>
+  
+    <div id="page" class="template">
+      <h1>{{title}}</h1>
+      <div class="body">
+        {{body}}
+      </div>
+    </div>
 
     <!-- You can also require other files to run in this process -->
     <script src="./renderer.js"></script>
+    <script src="./server.js"></script>
   </body>
 </html>
