@@ -43,11 +43,12 @@
       });
       //asd
       wss.on('connection', function connection(ws) {
-          ws.on('message', function incoming(message) {
-              console.log('received:', message);
-          });
-          
-          ws.send('something');
+        console.log("client connected", ws);
+        ws.on('message', function incoming(message) {
+            console.log('received:', message);
+        });
+
+        ws.send('something');
       });
     </script>
 

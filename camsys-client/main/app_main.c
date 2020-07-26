@@ -13,12 +13,39 @@
 #include "esp_vfs_common.h"
 #include "esp_vfs_dev.h"
 #include "esp_websocket_client.h"
+#include "esp_http_server.h"
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "hal/uart_types.h"
 #include "driver/uart.h"
 #include "driver/sdmmc_types.h"
 #include "driver/sdspi_host.h"
+
+// ------------------------- CAMERA INCLUDES --------------------------
+#define CONFIG_OV2640_SUPPORT true
+#include "esp_camera.h"
+#include "xclk.h"
+#include "sccb.h"
+#include "ov2640.h"
+#include "sensor.h"
+#include "yuv.h"
+#include "twi.h"
+#include "esp_jpg_decode.h"
+
+#define TAG "espcam"
+#include "xclk.c"
+#include "ov2640.c"
+#include "sccb.c"
+#include "sensor.c"
+#include "yuv.c"
+#include "twi.c"
+#include "to_bmp.c"
+#include "esp_jpg_decode.c"
+#include "camera.c"
+#undef TAG
+// --------------------------------------------------------------------
+
+
 
 
 #define CAMSYS_NAMESPACE "camsys"
@@ -268,6 +295,43 @@ char* strncpy_offs(char* dest, size_t offs, const char* src, size_t max) {
     return dest;
 }
 
+
+// ------------------------------------------------------
+// CAMSYS
+// ------------------------------------------------------
+
+#define CAMSYS_MODE_CAMERA true
+#define CAMSYS_MODE_MOTION false
+
+// do different things when mode is camera/motion
+#define CAMSYS_BY_APP_MODE(camera, motion) if (app->ext->sys->mode) camera else motion
+#define CAMSYS_BY_EXT_MODE(camera, motion) if (ext->sys->mode) camera else motion
+#define CAMSYS_BY_SYS_MODE(camera, motion) if (sys->mode) camera else motion
+#define CAMSYS_BY_MODE(camera, motion) if (mode) camera else motion
+
+struct camsys_camera_s {
+    
+};
+
+typedef struct camsys_camera_s camsys_camera_t;
+
+struct camsys_motion_s {
+    
+};
+
+typedef struct camsys_motion_s camsys_motion_t;
+
+struct camsys_s {
+    bool mode;
+    bool streaming;
+    camsys_camera_t* camera;
+    camsys_motion_t* motion;
+
+    httpd_handle_t server;
+};
+
+typedef struct camsys_s camsys_t;
+
 // ---------------------------------------------------------------
 // WIFI CREDENTIALS
 // ---------------------------------------------------------------
@@ -313,6 +377,8 @@ struct wscli_app_s {
     websock_app_cb_func_t on_websock_data;
     websock_app_cb_func_t on_websock_error;
     app_cb_func_t on_websock_loop;
+
+    camsys_t* sys;
 };
 
 typedef struct wscli_app_s wscli_app_t;
@@ -390,6 +456,178 @@ void gpio_pins_init(uint64_t _pin_bit_mask) {
         .intr_type = GPIO_INTR_DISABLE,
     };
     ESP_ERROR_CHECK( gpio_config(&io_conf) );
+}
+
+// ---------------------------------------------------------------
+// CAMSYS APP
+// ---------------------------------------------------------------
+
+
+//CAMERA_MODEL_AI_THINKER PIN Map
+#define CAM_PIN_PWDN    32 //power down is not used
+#define CAM_PIN_RESET   -1 //software reset will be performed
+#define CAM_PIN_XCLK    0
+#define CAM_PIN_SIOD    26
+#define CAM_PIN_SIOC    27
+
+#define CAM_PIN_D7      35
+#define CAM_PIN_D6      34
+#define CAM_PIN_D5      39
+#define CAM_PIN_D4      36
+#define CAM_PIN_D3      21
+#define CAM_PIN_D2      19
+#define CAM_PIN_D1      18
+#define CAM_PIN_D0       5
+#define CAM_PIN_VSYNC   25
+#define CAM_PIN_HREF    23
+#define CAM_PIN_PCLK    22
+
+#define CAMSYS_CAMERA_CONFIG_DEFAULT() { \
+    .pin_pwdn  = CAM_PIN_PWDN, \
+    .pin_reset = CAM_PIN_RESET, \
+    .pin_xclk = CAM_PIN_XCLK, \
+    .pin_sscb_sda = CAM_PIN_SIOD, \
+    .pin_sscb_scl = CAM_PIN_SIOC, \
+    .pin_d7 = CAM_PIN_D7, \
+    .pin_d6 = CAM_PIN_D6, \
+    .pin_d5 = CAM_PIN_D5, \
+    .pin_d4 = CAM_PIN_D4, \
+    .pin_d3 = CAM_PIN_D3, \
+    .pin_d2 = CAM_PIN_D2, \
+    .pin_d1 = CAM_PIN_D1, \
+    .pin_d0 = CAM_PIN_D0, \
+    .pin_vsync = CAM_PIN_VSYNC, \
+    .pin_href = CAM_PIN_HREF, \
+    .pin_pclk = CAM_PIN_PCLK, \
+    .xclk_freq_hz = 20000000, \
+    .ledc_timer = LEDC_TIMER_0, \
+    .ledc_channel = LEDC_CHANNEL_0, \
+    .pixel_format = PIXFORMAT_JPEG, \
+    .frame_size = FRAMESIZE_QVGA, \
+    .jpeg_quality = 12, \
+    .fb_count = 1 \
+};
+
+void camsys_init(bool mode) {
+    //power up the camera if PWDN pin is defined
+    if(CAM_PIN_PWDN != -1){
+        pinMode(CAM_PIN_PWDN, OUTPUT);
+        digitalWrite(CAM_PIN_PWDN, LOW);
+    }
+
+    camera_config_t config = CAMSYS_CAMERA_CONFIG_DEFAULT();
+    CAMSYS_BY_MODE({
+        config.pixel_format = PIXFORMAT_JPEG;
+        config.frame_size = FRAMESIZE_QVGA;
+        config.jpeg_quality = 12;
+    }, {
+        config.pixel_format = PIXFORMAT_GRAYSCALE;
+        config.frame_size = FRAMESIZE_96X96;
+        config.jpeg_quality = 0;
+    });    
+
+    //initialize the camera
+    ESP_ERROR_CHECK( esp_camera_init(&config) );
+}
+
+
+
+// ---------------------------------------------------------------
+// CAMSYS APP (streaming)
+// ---------------------------------------------------------------
+
+#define CAMERA_PART_BOUNDARY "123456789000000000000987654321"
+static const char* CAMSYS_CAMERA_STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" CAMERA_PART_BOUNDARY;
+static const char* CAMSYS_CAMERA_STREAM_BOUNDARY = "\r\n--" CAMERA_PART_BOUNDARY "\r\n";
+static const char* CAMSYS_CAMERA_STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n";
+
+wifi_app_t* _app = NULL;
+
+esp_err_t camsys_uri_camera_stream_httpd_handler(httpd_req_t* req) {
+    wifi_app_t* app = _app;
+
+    esp_err_t res = ESP_OK;
+    camera_fb_t * fb = NULL;
+    size_t _jpg_buf_len;
+    uint8_t * _jpg_buf;
+    char * part_buf[64];
+
+    res = httpd_resp_set_type(req, CAMSYS_CAMERA_STREAM_CONTENT_TYPE);
+    if(res != ESP_OK) return res;
+    
+    app->ext->sys->streaming = true;
+    while(app->ext->sys->streaming) {
+        fb = esp_camera_fb_get();
+        if (!fb) {
+            ESP_LOGE("camsys", "Camera capture failed");
+            res = ESP_FAIL;
+            break;
+        }
+
+        _jpg_buf_len = fb->len;
+        _jpg_buf = fb->buf;
+        
+
+        if(res == ESP_OK){
+            res = httpd_resp_send_chunk(req, CAMSYS_CAMERA_STREAM_BOUNDARY, strlen(CAMSYS_CAMERA_STREAM_BOUNDARY));
+        }
+        if(res == ESP_OK){
+            size_t hlen = snprintf((char *)part_buf, 64, CAMSYS_CAMERA_STREAM_PART, _jpg_buf_len);
+
+            res = httpd_resp_send_chunk(req, (const char *)part_buf, hlen);
+        }
+        if(res == ESP_OK){
+            res = httpd_resp_send_chunk(req, (const char *)_jpg_buf, _jpg_buf_len);
+        }
+        if(fb->format != PIXFORMAT_JPEG){
+            free(_jpg_buf);
+        }
+        esp_camera_fb_return(fb);
+        if(res != ESP_OK){
+            break;
+        }
+        
+    }
+    app->ext->sys->streaming = false;
+    return res;
+}
+
+static const httpd_uri_t camsys_uri_camera_stream = {
+    .uri       = "/stream",
+    .method    = HTTP_GET,
+    .handler   = camsys_uri_camera_stream_httpd_handler,
+    /* Let's pass response string in user
+     * context to demonstrate it's usage */
+    .user_ctx  = NULL
+};
+
+//Function for starting the webserver
+void camera_httpd_server_init(wifi_app_t* app)
+{
+    _app = app;
+    // Generate default configuration
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+
+    // Empty handle to http_server
+    app->ext->sys->server = NULL;
+
+    // Start the httpd server
+    ESP_ERROR_CHECK(httpd_start(&app->ext->sys->server, &config));
+    // Register URI handlers
+    ESP_ERROR_CHECK(httpd_register_uri_handler(app->ext->sys->server, &camsys_uri_camera_stream));
+
+    // If server failed to start, handle will be NULL
+}
+
+// ----------------- camera/motion websocket loops ---------------------
+
+void camsys_camera_websock_loop(wifi_app_t* app) {
+    // TODO ...
+    
+}
+
+void camsys_motion_websock_loop(wifi_app_t* app) {
+    // TODO ...
 }
 
 // ---------------------------------------------------------------
@@ -593,10 +831,20 @@ void wifi_connection_keep_alive(wifi_app_t* app) {
     if (wifi_disconnected) wifi_connection_establish(app);
 }
 
+
 void wifi_app_run(wifi_app_t* app) {
+
+    // TODO may cam should be initialized here?
+
     wifi_init();
 
+    camera_httpd_server_init(app);
+
+    // TODO may cam should be initialized here?
+
     wifi_connection_establish(app);
+
+    // TODO may cam should be initialized here?
 
     while(!app->exited) {
         wifi_connection_keep_alive(app);
@@ -687,23 +935,38 @@ void wifi_app_settings(wifi_app_t* app) {
     ESP_ERROR_CHECK( serial_uninstall(UART_NUM_0) );
 }
 
-// --------------
-
 
 
 void wifi_app_main(wifi_app_t* app) {
+    camsys_init(app);
+    ESP_LOGI(TAG, "camera initialized...");
+
+
+    // TODO may cam should be initialized here? 1
     flash_init();
+
+    // TODO may cam should be initialized here?
 
     // NVS Open
     ESP_ERROR_CHECK( nvs_open(app->namespace, NVS_READWRITE, &app->nvs_handle) );
     
+    // TODO may cam should be initialized here?
+
     app->mode = wifi_app_get_mode();
+
+    // TODO may cam should be initialized here?
+
     switch (app->mode) {
         case WIFI_APP_MODE_SETTING:
             wifi_app_settings(app);
             break;
         case WIFI_APP_MODE_RUN:
+            // TODO may cam should be initialized here?
+
             ESP_ERROR_CHECK( wifi_creds_load(app) );
+
+            // TODO may cam should be initialized here?
+
             wifi_app_run(app);
             break;
         default:
@@ -822,44 +1085,46 @@ void wscli_app_websocket_stop(wifi_app_t* app) {
 void wscli_app_loop(void* arg) {
     wifi_app_t* app = arg;
     if (wifi_disconnected_prev != wifi_disconnected) {
-        ESP_LOGI(TAG, "WIFI STATUS CHANGED TO %s\n", wifi_disconnected ? "DESCONNECTED" : "CONNECTED");
+        // ESP_LOGI(TAG, "WIFI STATUS CHANGED TO %s\n", wifi_disconnected ? "DESCONNECTED" : "CONNECTED");
         if (wifi_disconnected) wscli_app_websocket_stop(app); 
         else wscli_app_websocket_start(app);
         wifi_disconnected_prev = wifi_disconnected;
         if (wifi_disconnected && app->ext->on_wifi_disconnected) (app->ext->on_wifi_disconnected)(app);
         else if (!wifi_disconnected && app->ext->on_wifi_connected) (app->ext->on_wifi_connected)(app);
     } else {
-        ESP_LOGI(TAG, "WIFI STATUS IS %s\n", wifi_disconnected ? "DESCONNECTED" : "CONNECTED");
+        // ESP_LOGI(TAG, "WIFI STATUS IS %s\n", wifi_disconnected ? "DESCONNECTED" : "CONNECTED");
         wifi_disconnected_prev = wifi_disconnected;
         if(app->ext->on_websock_loop) (app->ext->on_websock_loop)(app);
     }
 }
 
 // ------------------------------------------------------
+// WSCLI EVENT HANDLERS
+// ------------------------------------------------------
 
 void wscli_app_on_wifi_connected(void* arg) {
-    wifi_app_t* app = arg;
-    ESP_LOGI(TAG, "----------- [WIFI CONNECTED] -------------");
+    // wifi_app_t* app = arg; // using argument as an app
+    // ESP_LOGI(TAG, "----------- [WIFI CONNECTED] -------------");
 }
 
 void wscli_app_on_wifi_disconnected(void* arg) {
-    wifi_app_t* app = arg;
-    ESP_LOGI(TAG, "----------- [WIFI DISCONNECTED] -------------");
+    // wifi_app_t* app = arg; // using argument as an app
+    // ESP_LOGI(TAG, "----------- [WIFI DISCONNECTED] -------------");
 }
 
 void wscli_app_on_websock_connected(void* arg) {
-    wifi_app_t* app = arg;
-    ESP_LOGI(TAG, "----------- [WEBSOCKET CONNECTED] -------------");
+    // wifi_app_t* app = arg; // using argument as an app
+    // ESP_LOGI(TAG, "----------- [WEBSOCKET CONNECTED] -------------");
     
 }
 
 void wscli_app_on_websock_disconnected(void* arg) {
-    wifi_app_t* app = arg;
-    ESP_LOGI(TAG, "----------- [WEBSOCKET DISCONNECTED] -------------");
+    // wifi_app_t* app = arg; // using argument as an app
+    // ESP_LOGI(TAG, "----------- [WEBSOCKET DISCONNECTED] -------------");
 }
 
 void wscli_app_on_websock_data(void* arg, esp_websocket_event_data_t* data) {
-    wifi_app_t* app = arg;
+    // wifi_app_t* app = arg; // using argument as an app
     ESP_LOGI(TAG, "----------- [WEBSOCKET DATA] -------------");
 
     ESP_LOGI(TAG, "WEBSOCKET_EVENT_DATA");
@@ -867,24 +1132,36 @@ void wscli_app_on_websock_data(void* arg, esp_websocket_event_data_t* data) {
     ESP_LOGW(TAG, "Received=%.*s", data->data_len, (char *)data->data_ptr);
     ESP_LOGW(TAG, "Total payload length=%d, data_len=%d, current payload offset=%d\r\n", data->payload_len, data->data_len, data->payload_offset);
 
-    const char* response_fmt = "ECHO: %s\n\0";
-    const size_t response_size = data->data_len + strlen(response_fmt) + 1;
-    char response_buff[response_size];
-    int outlen = snprintf(response_buff, response_size, response_fmt, data->data_ptr);
-    if (-1 == esp_websocket_client_send_text(app->ext->client, response_buff, outlen, portMAX_DELAY)) {
-        ESP_LOGE(TAG, "Message error");
-    }
+    // const char* response_fmt = "ECHO: %s\n\0";
+    // const size_t response_size = data->data_len + strlen(response_fmt) + 1;
+    // char response_buff[response_size];
+    // int outlen = snprintf(response_buff, response_size, response_fmt, data->data_ptr);
+    // if (-1 == esp_websocket_client_send_text(app->ext->client, response_buff, outlen, portMAX_DELAY)) {
+    //     ESP_LOGE(TAG, "Message error");
+    // }
 }
 
 void wscli_app_on_websock_error(void* arg, esp_websocket_event_data_t* data) {
-    wifi_app_t* app = arg;
-    ESP_LOGI(TAG, "----------- [WEBSOCKET ERROR] -------------");
+    // wifi_app_t* app = arg; // using argument as an app
+    // ESP_LOGI(TAG, "----------- [WEBSOCKET ERROR] -------------");
 }
 
 void wscli_app_on_websock_loop(void* arg) {
-    wifi_app_t* app = arg;
-    ESP_LOGI(TAG, "----------- [WEBSOCKET LOOP] -------------");
-    delay(1000);
+    wifi_app_t* app = arg; // using argument as an app
+
+    CAMSYS_BY_APP_MODE(
+        camsys_camera_websock_loop(app);, 
+        camsys_motion_websock_loop(app);
+    );
+    // if (app->ext->sys->streaming) {
+    //     camera_fb_t* fb = esp_camera_fb_get();
+    //     if (fb) {
+    //         if (app->ext->sys->streaming && fb->len != esp_websocket_client_send_bin(app->ext->client, (char*)fb->buf, fb->len, portMAX_DELAY)) ESP_LOGE("camsys", "Image send failed");
+    //         if (fb->format != PIXFORMAT_JPEG) free(fb->buf);
+    //         esp_camera_fb_return(fb);
+    //     } else ESP_LOGE("camsys", "Camera capture failed");
+    // }
+
 }
 
 
@@ -895,16 +1172,13 @@ void wscli_app_main(wscli_app_t* ext) {
     app.namespace = CAMSYS_NAMESPACE;
     app.exited = false; 
     app.ext = ext;
-
     wifi_app_main(&app);
 }
 
-// -
+// ----------------------------
 
-void app_main(void)
+void camsys_app_main(camsys_t* sys)
 {
-    //esp_log_level_set("*", ESP_LOG_NONE);
-
     wscli_app_t ext;
 
     ext.no_data_timeout_sec = 10;
@@ -922,7 +1196,36 @@ void app_main(void)
     ext.on_websock_data = wscli_app_on_websock_data;
     ext.on_websock_error = wscli_app_on_websock_error;
     ext.on_websock_loop = wscli_app_on_websock_loop;
+
+    ext.sys = sys;
     wscli_app_main(&ext);
+
+}
+
+
+void rec_app_main() {
+    //esp_log_level_set("*", ESP_LOG_NONE);
+
+    // ESP_ERROR_CHECK(httpd_register_uri_handler(httpd_server, &uri_camera_stream));
+    // ESP_ERROR_CHECK(httpd_register_uri_handler(httpd_server, &uri_motion_stream));
+    
+    camsys_t sys;
+    sys.mode = CAMSYS_MODE_CAMERA;
+    sys.streaming = false;
+
+    camsys_camera_t camera;
+
+    camsys_motion_t motion;
+
+    sys.camera = &camera;
+    sys.motion = &motion;
+    camsys_app_main(&sys);
+
+}
+
+void app_main() {
+    // TODO sdcard..
+    rec_app_main();
 
     fflush(stdout);
     delay(1000);
