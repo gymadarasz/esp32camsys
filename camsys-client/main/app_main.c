@@ -576,7 +576,7 @@ void gpio_pins_init(uint64_t _pin_bit_mask) {
     .fb_count = 1 \
 };
 
-void camsys_init(bool mode) {
+void camsys_camera_init(bool mode) {
     //power up the camera if PWDN pin is defined
     if(CAM_PIN_PWDN != -1){
         pinMode(CAM_PIN_PWDN, OUTPUT);
@@ -729,7 +729,7 @@ esp_err_t camsys_httpd_handler(httpd_req_t* req) {
     );
 }
 
-static const httpd_uri_t camsys_uri_camera_stream = {
+static const httpd_uri_t camsys_uri = {
     .uri       = "/",
     .method    = HTTP_GET,
     .handler   = camsys_httpd_handler,
@@ -739,7 +739,7 @@ static const httpd_uri_t camsys_uri_camera_stream = {
 };
 
 //Function for starting the webserver
-void camera_httpd_server_init(wifi_app_t* app)
+void camsys_httpd_server_init(wifi_app_t* app)
 {
     _app = app;
     // Generate default configuration
@@ -751,7 +751,7 @@ void camera_httpd_server_init(wifi_app_t* app)
     // Start the httpd server
     ESP_ERROR_CHECK(httpd_start(&app->ext->sys->server, &config));
     // Register URI handlers
-    ESP_ERROR_CHECK(httpd_register_uri_handler(app->ext->sys->server, &camsys_uri_camera_stream));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(app->ext->sys->server, &camsys_uri));
 
     // If server failed to start, handle will be NULL
 }
@@ -1043,7 +1043,7 @@ void wifi_app_run(wifi_app_t* app) {
 
     wifi_init();
 
-    camera_httpd_server_init(app);
+    camsys_httpd_server_init(app);
 
     // TODO may cam should be initialized here?
     sdcard_init();
@@ -1146,7 +1146,7 @@ void wifi_app_settings(wifi_app_t* app) {
 
 
 void wifi_app_main(wifi_app_t* app) {
-    camsys_init(app->ext->sys->mode);
+    camsys_camera_init(app->ext->sys->mode);
     ESP_LOGI(TAG, "camera initialized...");
 
 
