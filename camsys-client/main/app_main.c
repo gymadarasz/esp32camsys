@@ -333,19 +333,9 @@ char* strncpy_offs(char* dest, size_t offs, const char* src, size_t max) {
     return dest;
 }
 
-
 // ------------------------------------------------------
-// CAMSYS
+// CAMERA
 // ------------------------------------------------------
-
-#define CAMSYS_MODE_CAMERA true
-#define CAMSYS_MODE_MOTION false
-
-// do different things when mode is camera/motion
-#define CAMSYS_BY_APP_MODE(camera, motion) if (app->ext->sys->mode) camera else motion
-#define CAMSYS_BY_EXT_MODE(camera, motion) if (ext->sys->mode) camera else motion
-#define CAMSYS_BY_SYS_MODE(camera, motion) if (sys->mode) camera else motion
-#define CAMSYS_BY_MODE(camera, motion) if (mode) camera else motion
 
 struct camsys_camera_s {
     FILE* file;
@@ -374,11 +364,30 @@ esp_err_t camera_recording_start(camsys_camera_t* camera) {
     return ESP_OK;    
 }
 
+// ------------------------------------------------------
+// MOTION
+// ------------------------------------------------------
+
 struct camsys_motion_s {
     
 };
 
 typedef struct camsys_motion_s camsys_motion_t;
+
+// ------------------------------------------------------
+// CAMSYS
+// ------------------------------------------------------
+
+#define CAMSYS_MODE_CAMERA true
+#define CAMSYS_MODE_MOTION false
+
+// do different things when mode is camera/motion
+#define CAMSYS_BY_APP_MODE(camera, motion) if (app->ext->sys->mode) camera else motion
+#define CAMSYS_BY_EXT_MODE(camera, motion) if (ext->sys->mode) camera else motion
+#define CAMSYS_BY_SYS_MODE(camera, motion) if (sys->mode) camera else motion
+#define CAMSYS_BY_MODE(camera, motion) if (mode) camera else motion
+
+
 
 struct camsys_s {
     bool mode;
@@ -627,27 +636,27 @@ esp_err_t camsys_fb_return(camera_fb_t * fb) {
 }
 
 bool camsys_check_secret(httpd_req_t* req) {
-    bool secret_ok = false;
-    if (!nvs_http_settings.secret || nvs_http_settings.secret[0] == '\0') return secret_ok;
-
-    /* Read URL query string length and allocate memory for length + 1,
-     * extra byte for null termination */
-    size_t buf_len = httpd_req_get_url_query_len(req) + 1;
-    if (buf_len > 1) {
-        char* buf = malloc(buf_len);
-        if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK) {
-            ESP_LOGI("camsys", "Found URL query"/*, buf*/);
-            char param[40];
-            /* Get value of expected key from query string */
-            if (httpd_query_key_value(buf, "secret", param, sizeof(param)) == ESP_OK) {
-                ESP_LOGI("camsys", "Found URL query parameter => secret"/*, param*/);
-                if (!strcmp(param, nvs_http_settings.secret)) secret_ok = true;
-            }
-        }
-        free(buf);
-    }
     return true; // TODO: remove this line to validate secret parameter
-    return secret_ok;
+    // bool secret_ok = false;
+    // if (!nvs_http_settings.secret || nvs_http_settings.secret[0] == '\0') return secret_ok;
+
+    // /* Read URL query string length and allocate memory for length + 1,
+    //  * extra byte for null termination */
+    // size_t buf_len = httpd_req_get_url_query_len(req) + 1;
+    // if (buf_len > 1) {
+    //     char* buf = malloc(buf_len);
+    //     if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK) {
+    //         ESP_LOGI("camsys", "Found URL query"/*, buf*/);
+    //         char param[40];
+    //         /* Get value of expected key from query string */
+    //         if (httpd_query_key_value(buf, "secret", param, sizeof(param)) == ESP_OK) {
+    //             ESP_LOGI("camsys", "Found URL query parameter => secret"/*, param*/);
+    //             if (!strcmp(param, nvs_http_settings.secret)) secret_ok = true;
+    //         }
+    //     }
+    //     free(buf);
+    // }
+    // return secret_ok;
 }
 
 esp_err_t camsys_camera_httpd_handler(wifi_app_t* app, httpd_req_t* req) {
@@ -704,7 +713,7 @@ esp_err_t camsys_camera_httpd_handler(wifi_app_t* app, httpd_req_t* req) {
     return res;
 }
 
-esp_err_t camsys_camera_httpd_handler(wifi_app_t* app, httpd_req_t* req) {
+esp_err_t camsys_motion_httpd_handler(wifi_app_t* app, httpd_req_t* req) {
     esp_err_t res = ESP_OK;
     // TODO capture a bmp
     return res;
@@ -715,11 +724,9 @@ esp_err_t camsys_httpd_handler(httpd_req_t* req) {
     if (!camsys_check_secret(req)) return ESP_FAIL;
     wifi_app_t* app = _app;
     CAMSYS_BY_APP_MODE(
-        camsys_camera_httpd_handler(app, req);,
-        camsys_motion_httpd_handler(app, req);
+        return camsys_camera_httpd_handler(app, req);,
+        return camsys_motion_httpd_handler(app, req);
     );
-
-    return res;
 }
 
 static const httpd_uri_t camsys_uri_camera_stream = {
@@ -756,8 +763,76 @@ void camsys_camera_websock_loop(wifi_app_t* app) {
     
 }
 
+// -----------------------------------
+
+#define WATCHER_MAX_SIZE 40
+#define WATCHER_BUFF_SIZE WATCHER_MAX_SIZE*WATCHER_MAX_SIZE*4
+uint8_t watcher_prev_buf[WATCHER_BUFF_SIZE];
+
+struct watcher_s {
+    int x;
+    int y;
+    int size;
+    int raster;
+    int threshold;
+
+    size_t diff_sum_max;
+};
+
+typedef struct watcher_s watcher_t;
+
+#define WATCHER_DEFAULT {43, 43, 10, 5, 250, 0}
+
+watcher_t watcher = WATCHER_DEFAULT;
+
+
+void watcher_show_diff(size_t diff_sum, bool alert) {
+    char spc[] = "]]]]]]]]]]]]]]]]]]]]]]]]]]]]][";
+    char* s = spc; 
+    for (int i=0; i<29; i++) {
+        if (i*10>diff_sum) s[i] = ' ';
+    }
+    char sbuff[100];
+    snprintf(sbuff, 100, "%s (%u) %s", s, diff_sum, alert ? "ALERT!!!" : "");
+    ESP_LOGI(TAG, "%s", sbuff);
+}
+
 void camsys_motion_websock_loop(wifi_app_t* app) {
     // TODO ...
+    camera_fb_t* fb = camsys_fb_get(app);            
+    if (!fb) ESP_LOGE(TAG, "Motion Camera capture failed");
+    
+
+    int xfrom = watcher.x - watcher.size;
+    int xto = watcher.x + watcher.size;
+    int yfrom = watcher.y - watcher.size;
+    int yto = watcher.y + watcher.size;
+    int i=0;
+    size_t diff_sum = 0;
+    for (int x=xfrom; x<xto; x+=watcher.raster) {
+        for (int y=yfrom; y<yto; y+=watcher.raster) {
+            int diff = fb->buf[x+y*fb->width] - watcher_prev_buf[i];
+            diff_sum += (diff > 0 ? diff : -diff);
+            if (i>=WATCHER_BUFF_SIZE) {
+                ESP_LOGE(TAG, "buff size too large");
+                break;
+            }
+            watcher_prev_buf[i] = fb->buf[x+y*fb->width];
+            i++;
+        }
+    }
+
+    if (watcher.diff_sum_max < diff_sum) watcher.diff_sum_max = diff_sum;
+    
+    bool alert = diff_sum >= watcher.threshold;
+    watcher_show_diff(diff_sum, alert);
+    if (alert) {
+        // PRINT("******************************************************");
+        // PRINT("*********************** [ALERT] **********************");
+        // PRINT("******************************************************");
+    }
+    
+    ESP_ERROR_CHECK( camsys_fb_return(fb) );
 }
 
 // ---------------------------------------------------------------
@@ -1071,7 +1146,7 @@ void wifi_app_settings(wifi_app_t* app) {
 
 
 void wifi_app_main(wifi_app_t* app) {
-    camsys_init(app);
+    camsys_init(app->ext->sys->mode);
     ESP_LOGI(TAG, "camera initialized...");
 
 
@@ -1343,7 +1418,7 @@ void rec_app_main() {
     // ESP_ERROR_CHECK(httpd_register_uri_handler(httpd_server, &uri_motion_stream));
     
     camsys_t sys;
-    sys.mode = CAMSYS_MODE_CAMERA;
+    sys.mode = CAMSYS_MODE_MOTION; // CAMSYS_MODE_CAMERA;
     sys.streaming = false;
 
     camsys_camera_t camera;

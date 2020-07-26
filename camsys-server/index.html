@@ -43,7 +43,7 @@
       });
       //asd
       wss.on('connection', function connection(ws) {
-        console.log("client connected", ws);
+        console.log("client connected", ws, wss);
         ws.on('message', function incoming(message) {
             console.log('received:', message);
         });
