@@ -297,14 +297,21 @@ typedef void (*websock_app_cb_func_t)(void* app, esp_websocket_event_data_t* dat
 
 
 struct wscli_app_s {
+
+    int no_data_timeout_sec;
+    const char* wsuri_fmt;
+    esp_websocket_client_config_t websocket_cfg;
+    esp_websocket_client_handle_t client;
+
     app_cb_func_t settings_func;
     app_cb_func_t loop_func;
+
     app_cb_func_t on_wifi_connected;
     app_cb_func_t on_wifi_disconnected;
     app_cb_func_t on_websock_connected;
     app_cb_func_t on_websock_disconnected;
     websock_app_cb_func_t on_websock_data;
-    app_cb_func_t on_websock_error;
+    websock_app_cb_func_t on_websock_error;
     app_cb_func_t on_websock_loop;
 };
 
@@ -746,15 +753,9 @@ void wscli_app_settings(void* arg) {
 // WEBSOCKET CLIENT APP (loop)
 // ---------------------------------------------------------------
 
-#define WEBSOCK_STATUS_CONNECTED 1
-#define WEBSOCK_STATUS_DISCONNECTED 0
 
-#define NO_DATA_TIMEOUT_SEC 10
-esp_websocket_client_config_t websocket_cfg = {};
 static TimerHandle_t shutdown_signal_timer;
 static SemaphoreHandle_t shutdown_sema;
-esp_websocket_client_handle_t client;
-const char* wsuri = "ws://192.168.0.200";
 
 static void wscli_app_shutdown_signaler(TimerHandle_t xTimer)
 {
@@ -774,10 +775,10 @@ static void wscli_app_websocket_event_handler(void *handler_args, esp_event_base
         break;
     case WEBSOCKET_EVENT_DATA:
         xTimerReset(shutdown_signal_timer, portMAX_DELAY);
-        if (app->ext->on_websock_data) (app->ext->on_websock_data)(app, data);
+        if (data->data_len && app->ext->on_websock_data) (app->ext->on_websock_data)(app, data);
         break;
     case WEBSOCKET_EVENT_ERROR:
-        if (app->ext->on_websock_error) (app->ext->on_websock_error)(app);
+        if (app->ext->on_websock_error) (app->ext->on_websock_error)(app, data);
         break;
     default:
         ESP_LOGE(TAG, "Websocket event unhandled: %d", event_id);
@@ -787,30 +788,33 @@ static void wscli_app_websocket_event_handler(void *handler_args, esp_event_base
 }
 
 void wscli_app_websocket_start(wifi_app_t* app) {
-    
-    memset(&websocket_cfg, 0, sizeof(websocket_cfg));
 
-    shutdown_signal_timer = xTimerCreate("Websocket shutdown timer", NO_DATA_TIMEOUT_SEC * 1000 / portTICK_PERIOD_MS,
+    shutdown_signal_timer = xTimerCreate("Websocket shutdown timer", app->ext->no_data_timeout_sec * 1000 / portTICK_PERIOD_MS,
                                          pdFALSE, NULL, wscli_app_shutdown_signaler);
     shutdown_sema = xSemaphoreCreateBinary();
 
-    //ESP_ERROR_CHECK_WITHOUT_ABORT( wscli_app_host_load(app->nvs_handle, wsuri, WSURI_LENGTH_MAX) );
-    websocket_cfg.uri = wsuri;
+    const size_t buff_size = 200;
+    char host_buff[buff_size];
+    char wsuri_buff[buff_size];
+    ESP_ERROR_CHECK( wscli_app_host_load(app->nvs_handle, host_buff, buff_size) );
+    snprintf(wsuri_buff, buff_size, app->ext->wsuri_fmt, host_buff);
+    app->ext->websocket_cfg.uri = wsuri_buff;
     
-    ESP_LOGI(TAG, "Connecting to %s...", websocket_cfg.uri);
+    ESP_LOGI(TAG, "Connecting to %s...", app->ext->websocket_cfg.uri);
 
-    client = esp_websocket_client_init(&websocket_cfg);
-    ESP_ERROR_CHECK_WITHOUT_ABORT( esp_websocket_register_events(client, WEBSOCKET_EVENT_ANY, wscli_app_websocket_event_handler, (void *)app) );
+    app->ext->client = esp_websocket_client_init(&app->ext->websocket_cfg);
+    if (!app->ext->client) app->ext->on_websock_error(app, NULL);
+    ESP_ERROR_CHECK_WITHOUT_ABORT( esp_websocket_register_events(app->ext->client, WEBSOCKET_EVENT_ANY, wscli_app_websocket_event_handler, (void *)app) );
 
-    ESP_ERROR_CHECK_WITHOUT_ABORT( esp_websocket_client_start(client) );
+    ESP_ERROR_CHECK_WITHOUT_ABORT( esp_websocket_client_start(app->ext->client) );
     xTimerStart(shutdown_signal_timer, portMAX_DELAY);
 }
 
 void wscli_app_websocket_stop(wifi_app_t* app) {
     xSemaphoreTake(shutdown_sema, portMAX_DELAY);
-    ESP_ERROR_CHECK_WITHOUT_ABORT( esp_websocket_client_stop(client) );
+    ESP_ERROR_CHECK_WITHOUT_ABORT( esp_websocket_client_stop(app->ext->client) );
     ESP_LOGI(TAG, "Websocket Stopped");
-    ESP_ERROR_CHECK_WITHOUT_ABORT( esp_websocket_client_destroy(client) );
+    ESP_ERROR_CHECK_WITHOUT_ABORT( esp_websocket_client_destroy(app->ext->client) );
 }
 
 
@@ -846,6 +850,7 @@ void wscli_app_on_wifi_disconnected(void* arg) {
 void wscli_app_on_websock_connected(void* arg) {
     wifi_app_t* app = arg;
     ESP_LOGI(TAG, "----------- [WEBSOCKET CONNECTED] -------------");
+    
 }
 
 void wscli_app_on_websock_disconnected(void* arg) {
@@ -858,13 +863,20 @@ void wscli_app_on_websock_data(void* arg, esp_websocket_event_data_t* data) {
     ESP_LOGI(TAG, "----------- [WEBSOCKET DATA] -------------");
 
     ESP_LOGI(TAG, "WEBSOCKET_EVENT_DATA");
-    ESP_LOGI(TAG, "Received opcode=%d", data->op_code);
+    ESP_LOGI(TAG, "Received opcode=%d", data->op_code); // 1-text; 2-binary
     ESP_LOGW(TAG, "Received=%.*s", data->data_len, (char *)data->data_ptr);
     ESP_LOGW(TAG, "Total payload length=%d, data_len=%d, current payload offset=%d\r\n", data->payload_len, data->data_len, data->payload_offset);
 
+    const char* response_fmt = "ECHO: %s\n\0";
+    const size_t response_size = data->data_len + strlen(response_fmt) + 1;
+    char response_buff[response_size];
+    int outlen = snprintf(response_buff, response_size, response_fmt, data->data_ptr);
+    if (-1 == esp_websocket_client_send_text(app->ext->client, response_buff, outlen, portMAX_DELAY)) {
+        ESP_LOGE(TAG, "Message error");
+    }
 }
 
-void wscli_app_on_websock_error(void* arg) {
+void wscli_app_on_websock_error(void* arg, esp_websocket_event_data_t* data) {
     wifi_app_t* app = arg;
     ESP_LOGI(TAG, "----------- [WEBSOCKET ERROR] -------------");
 }
@@ -894,8 +906,15 @@ void app_main(void)
     //esp_log_level_set("*", ESP_LOG_NONE);
 
     wscli_app_t ext;
+
+    ext.no_data_timeout_sec = 10;
+    ext.wsuri_fmt = "ws://%s:8080";
+    memset(&ext.websocket_cfg, 0, sizeof(ext.websocket_cfg));
+    ext.client = NULL;
+
     ext.settings_func = wscli_app_settings;
     ext.loop_func = wscli_app_loop;
+
     ext.on_wifi_connected = wscli_app_on_wifi_connected;
     ext.on_wifi_disconnected = wscli_app_on_wifi_disconnected;
     ext.on_websock_connected = wscli_app_on_websock_connected;
