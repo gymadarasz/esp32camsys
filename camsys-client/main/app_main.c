@@ -21,6 +21,11 @@
 #include "driver/sdmmc_types.h"
 #include "driver/sdspi_host.h"
 
+#include "esp_vfs_fat.h"
+#include "driver/sdspi_host.h"
+#include "driver/spi_common.h"
+#include "sdmmc_cmd.h"
+
 // ------------------------- CAMERA INCLUDES --------------------------
 #define CONFIG_OV2640_SUPPORT true
 #include "esp_camera.h"
@@ -119,15 +124,15 @@ char* serial_readln() {
 // ---------------------------------------------------------------
 // SDCARD READ
 // ---------------------------------------------------------------
-
 #define SDCARD_TARGET_ESP32S2
-//#define SDCARD_TARGET_ESP32
+#undef SDCARD_TARGET_ESP32
 
 #ifdef SDCARD_TARGET_ESP32
 #include "driver/sdmmc_host.h"
 #endif
 
 #define SDCARD_MOUNT_POINT "/sdcard"
+#define SDCARD_FORMAT_IF_MOUNT_FAILED false
 
 // This example can use SDMMC and SPI peripherals to communicate with SD card.
 // By default, SDMMC peripheral is used.
@@ -142,7 +147,7 @@ char* serial_readln() {
 #endif // SDCARD_USE_SPI_MODE
 // on ESP32-S2, DMA channel must be the same as host id
 #define SDCARD_SPI_DMA_CHAN    host.slot
-#endif //CONFIG_IDF_TARGET_ESP32S2
+#endif //SDCARD_TARGET_ESP32S2
 
 // DMA channel to be used by the SPI peripheral
 #ifndef SDCARD_SPI_DMA_CHAN
@@ -163,50 +168,35 @@ char* serial_readln() {
 #define SDCARD_PIN_NUM_CS   13
 #endif //SDCARD_USE_SPI_MODE
 
-struct sdcard_s {
-    sdmmc_card_t* card;
-    int slot;
-};
 
-typedef struct sdcard_s sdcard_t;
+const char mount_point[] = SDCARD_MOUNT_POINT;
+sdmmc_card_t* card;
 
-/**
- * @brief Configuration arguments for esp_vfs_fat_sdmmc_mount and esp_vfs_fat_spiflash_mount functions
- */
-typedef struct {
-    bool format_if_mount_failed;
-    int max_files;
-    size_t allocation_unit_size;
-} sdcard_mount_config_t;
+#ifndef SDCARD_USE_SPI_MODE
+sdmmc_host_t host = SDMMC_HOST_DEFAULT();
+#else
+sdmmc_host_t host = SDSPI_HOST_DEFAULT();
+#endif //SDCARD_USE_SPI_MODE
 
-typedef esp_err_t (*sdcard_mount_func_t)(
-    const char* base_path,
-    const sdmmc_host_t* host_config_input,
-    const sdspi_device_config_t* slot_config,
-    const sdcard_mount_config_t* mount_config,
-    sdmmc_card_t** out_card
-);
-
-typedef esp_err_t (*sdcard_unmount_func_t)(const char *base_path, sdmmc_card_t *card);
-
-sdcard_t sdcard = {NULL, 0};
-
-esp_err_t sdcard_init(sdcard_mount_func_t mounter, bool auto_format, int max_files, size_t alloc_unit_size) {
-    esp_err_t ret = ESP_OK;
-    sdcard_mount_config_t mount_config;
-    mount_config.format_if_mount_failed = auto_format;
-    mount_config.max_files = max_files;
-    mount_config.allocation_unit_size = alloc_unit_size;
-    
-    const char mount_point[] = SDCARD_MOUNT_POINT;
+void sdcard_init(void)
+{
+    esp_err_t ret;
+    // Options for mounting the filesystem.
+    // If format_if_mount_failed is set to true, SD card will be partitioned and
+    // formatted in case when mounting fails.
+    esp_vfs_fat_sdmmc_mount_config_t mount_config = {
+        .format_if_mount_failed = SDCARD_FORMAT_IF_MOUNT_FAILED,
+        .max_files = 5,
+        .allocation_unit_size = 16 * 1024
+    };
+    ESP_LOGI(TAG, "Initializing SD card");
 
     // Use settings defined above to initialize SD card and mount FAT filesystem.
     // Note: esp_vfs_fat_sdmmc/sdspi_mount is all-in-one convenience functions.
     // Please check its source code and implement error recovery when developing
     // production applications.
 #ifndef SDCARD_USE_SPI_MODE
-    // ESP_LOGI("sdcard", "Using SDMMC peripheral");
-    sdmmc_host_t host = SDMMC_HOST_DEFAULT();
+    ESP_LOGI(TAG, "Using SDMMC peripheral");
 
     // This initializes the slot without card detect (CD) and write protect (WP) signals.
     // Modify slot_config.gpio_cd and slot_config.gpio_wp if your board has these signals.
@@ -224,9 +214,10 @@ esp_err_t sdcard_init(sdcard_mount_func_t mounter, bool auto_format, int max_fil
     gpio_set_pull_mode(12, GPIO_PULLUP_ONLY);   // D2, needed in 4-line mode only
     gpio_set_pull_mode(13, GPIO_PULLUP_ONLY);   // D3, needed in 4- and 1-line modes
 
-    ret = esp_vfs_fat_sdmmc_mount(mount_point, &host, &slot_config, &mount_config, &sdcard.card);
+    ret = esp_vfs_fat_sdmmc_mount(mount_point, &host, &slot_config, &mount_config, &card);
 #else
-    sdmmc_host_t host = SDSPI_HOST_DEFAULT();
+    ESP_LOGI(TAG, "Using SPI peripheral");
+
     spi_bus_config_t bus_cfg = {
         .mosi_io_num = SDCARD_PIN_NUM_MOSI,
         .miso_io_num = SDCARD_PIN_NUM_MISO,
@@ -237,9 +228,8 @@ esp_err_t sdcard_init(sdcard_mount_func_t mounter, bool auto_format, int max_fil
     };
     ret = spi_bus_initialize(host.slot, &bus_cfg, SDCARD_SPI_DMA_CHAN);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize sdcard bus.");
-        sdcard.slot = host.slot;
-        return ret;
+        ESP_LOGE(TAG, "Failed to initialize bus.");
+        return;
     }
 
     // This initializes the slot without card detect (CD) and write protect (WP) signals.
@@ -248,37 +238,77 @@ esp_err_t sdcard_init(sdcard_mount_func_t mounter, bool auto_format, int max_fil
     slot_config.gpio_cs = SDCARD_PIN_NUM_CS;
     slot_config.host_id = host.slot;
 
-    ret = mounter(mount_point, &host, &slot_config, &mount_config, &sdcard.card);
-#endif //USE_SPI_MODE
+    ret = esp_vfs_fat_sdspi_mount(mount_point, &host, &slot_config, &mount_config, &card);
+#endif //SDCARD_USE_SPI_MODE
 
     if (ret != ESP_OK) {
         if (ret == ESP_FAIL) {
-            ESP_LOGE("sdcard", "Failed to mount filesystem. "
-                /*"If you want the card to be formatted, set the EXAMPLE_FORMAT_IF_MOUNT_FAILED menuconfig option."*/);
+            ESP_LOGE(TAG, "Failed to mount filesystem. "
+                "If you want the card to be formatted, set the SDCARD_FORMAT_IF_MOUNT_FAILED menuconfig option.");
         } else {
-            ESP_LOGE("sdcard", "Failed to initialize the card (%s). "
-                /*"Make sure SD card lines have pull-up resistors in place."*/, esp_err_to_name(ret));
+            ESP_LOGE(TAG, "Failed to initialize the card (%s). "
+                "Make sure SD card lines have pull-up resistors in place.", esp_err_to_name(ret));
         }
-        sdcard.slot = host.slot;
-        return ret;
+        return;
     }
 
     // Card has been initialized, print its properties
-    // sdmmc_card_print_info(stdout, card);
-
-    sdcard.slot = host.slot;
-    return ret;
+    sdmmc_card_print_info(stdout, card);
 }
 
-esp_err_t sdcard_close(sdcard_unmount_func_t unmounter) {
+void sdcard_test() {
+    // Use POSIX and C standard library functions to work with files.
+    // First create a file.
+    ESP_LOGI(TAG, "Opening file");
+    FILE* f = fopen(SDCARD_MOUNT_POINT"/hello.txt", "w");
+    if (f == NULL) {
+        ESP_LOGE(TAG, "Failed to open file for writing");
+        return;
+    }
+    fprintf(f, "Hello %s!\n", card->cid.name);
+    fclose(f);
+    ESP_LOGI(TAG, "File written");
+
+    // Check if destination file exists before renaming
+    struct stat st;
+    if (stat(SDCARD_MOUNT_POINT"/foo.txt", &st) == 0) {
+        // Delete it if it exists
+        unlink(SDCARD_MOUNT_POINT"/foo.txt");
+    }
+
+    // Rename original file
+    ESP_LOGI(TAG, "Renaming file");
+    if (rename(SDCARD_MOUNT_POINT"/hello.txt", SDCARD_MOUNT_POINT"/foo.txt") != 0) {
+        ESP_LOGE(TAG, "Rename failed");
+        return;
+    }
+
+    // Open renamed file for reading
+    ESP_LOGI(TAG, "Reading file");
+    f = fopen(SDCARD_MOUNT_POINT"/foo.txt", "r");
+    if (f == NULL) {
+        ESP_LOGE(TAG, "Failed to open file for reading");
+        return;
+    }
+    char line[64];
+    fgets(line, sizeof(line), f);
+    fclose(f);
+    // strip newline
+    char* pos = strchr(line, '\n');
+    if (pos) {
+        *pos = '\0';
+    }
+    ESP_LOGI(TAG, "Read from file: '%s'", line);
+}
+
+void sdcard_close() {
     // All done, unmount partition and disable SDMMC or SPI peripheral
-    esp_err_t err_vfs = unmounter(SDCARD_MOUNT_POINT, sdcard.card);
-    esp_err_t err_spi = ESP_OK;
+    esp_vfs_fat_sdcard_unmount(mount_point, card);
+    ESP_LOGI(TAG, "Card unmounted");
 #ifdef SDCARD_USE_SPI_MODE
     //deinitialize the bus after all devices are removed
-    err_spi = spi_bus_free(sdcard.slot);
+    spi_bus_free(host.slot);
 #endif
-    return err_vfs ? err_vfs : err_spi;
 }
 
 // ---------------------------------------------------------------
@@ -555,6 +585,7 @@ esp_err_t camsys_uri_camera_stream_httpd_handler(httpd_req_t* req) {
     res = httpd_resp_set_type(req, CAMSYS_CAMERA_STREAM_CONTENT_TYPE);
     if(res != ESP_OK) return res;
     
+    sdcard_init();
     app->ext->sys->streaming = true;
     while(app->ext->sys->streaming) {
         fb = esp_camera_fb_get();
@@ -563,6 +594,9 @@ esp_err_t camsys_uri_camera_stream_httpd_handler(httpd_req_t* req) {
             res = ESP_FAIL;
             break;
         }
+
+
+        sdcard_test();
 
         _jpg_buf_len = fb->len;
         _jpg_buf = fb->buf;
@@ -589,6 +623,8 @@ esp_err_t camsys_uri_camera_stream_httpd_handler(httpd_req_t* req) {
         
     }
     app->ext->sys->streaming = false;
+
+    sdcard_close();
     return res;
 }
 
