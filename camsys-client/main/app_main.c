@@ -263,51 +263,6 @@ esp_err_t sdcard_init()
     return ret;
 }
 
-void sdcard_test() {
-    // Use POSIX and C standard library functions to work with files.
-    // First create a file.
-    ESP_LOGI(TAG, "Opening file");
-    FILE* f = fopen(SDCARD_MOUNT_POINT"/hello.txt", "w");
-    if (f == NULL) {
-        ESP_LOGE(TAG, "Failed to open file for writing");
-        return;
-    }
-    fprintf(f, "Hello %s!\n", sdcard->cid.name);
-    fclose(f);
-    ESP_LOGI(TAG, "File written");
-
-    // Check if destination file exists before renaming
-    struct stat st;
-    if (stat(SDCARD_MOUNT_POINT"/foo.txt", &st) == 0) {
-        // Delete it if it exists
-        unlink(SDCARD_MOUNT_POINT"/foo.txt");
-    }
-
-    // Rename original file
-    ESP_LOGI(TAG, "Renaming file");
-    if (rename(SDCARD_MOUNT_POINT"/hello.txt", SDCARD_MOUNT_POINT"/foo.txt") != 0) {
-        ESP_LOGE(TAG, "Rename failed");
-        return;
-    }
-
-    // Open renamed file for reading
-    ESP_LOGI(TAG, "Reading file");
-    f = fopen(SDCARD_MOUNT_POINT"/foo.txt", "r");
-    if (f == NULL) {
-        ESP_LOGE(TAG, "Failed to open file for reading");
-        return;
-    }
-    char line[64];
-    fgets(line, sizeof(line), f);
-    fclose(f);
-    // strip newline
-    char* pos = strchr(line, '\n');
-    if (pos) {
-        *pos = '\0';
-    }
-    ESP_LOGI(TAG, "Read from file: '%s'", line);
-}
-
 void sdcard_close() {
     if (!sdcard_initialized) return;
     // All done, unmount partition and disable SDMMC or SPI peripheral
@@ -427,6 +382,10 @@ typedef char wifi_creds_t[WIFI_CREDS_SIZE];
 typedef void (*app_cb_func_t)(void* app);
 typedef void (*websock_app_cb_func_t)(void* app, esp_websocket_event_data_t* data);
 
+#define WSCLI_APP_SECRET_SIZE 33
+typedef char wscli_app_secret_t[WSCLI_APP_SECRET_SIZE];
+#define WSCLI_APP_CID_SIZE 33
+typedef char wscli_app_cid_t[WSCLI_APP_CID_SIZE];
 
 struct wscli_app_s {
 
@@ -445,6 +404,9 @@ struct wscli_app_s {
     websock_app_cb_func_t on_websock_data;
     websock_app_cb_func_t on_websock_error;
     app_cb_func_t on_websock_loop;
+
+    wscli_app_secret_t secret;
+    wscli_app_cid_t cid;
 
     camsys_t* sys;
 };
@@ -669,7 +631,7 @@ esp_err_t camsys_camera_httpd_handler(wifi_app_t* app, httpd_req_t* req) {
     res = httpd_resp_set_type(req, CAMSYS_CAMERA_STREAM_CONTENT_TYPE);
     if(res != ESP_OK) return res;
     
-    ESP_ERROR_CHECK_WITHOUT_ABORT( camera_recording_start(app->ext->sys->camera) ); // TODO: remove this to switch off recording autostart
+    //ESP_ERROR_CHECK_WITHOUT_ABORT( camera_recording_start(app->ext->sys->camera) ); // TODO: remove this to switch off recording autostart
 
     app->ext->sys->streaming = true;
 
@@ -706,7 +668,7 @@ esp_err_t camsys_camera_httpd_handler(wifi_app_t* app, httpd_req_t* req) {
         
     }
     
-    ESP_ERROR_CHECK_WITHOUT_ABORT( camera_recording_stop(app->ext->sys->camera) );// TODO: remove this when recording autostart is switched off 
+    //ESP_ERROR_CHECK_WITHOUT_ABORT( camera_recording_stop(app->ext->sys->camera) );// TODO: remove this when recording autostart is switched off 
     
     app->ext->sys->streaming = false;
 
@@ -1070,36 +1032,6 @@ int wifi_app_get_mode() {
 
 // --------------
 
-/*
-An example setup:
-
-100 KEY
-KF4GTX9
-200 OK
-100 SSID 10/1:
-testwifi
-200 OK
-100 PSWD 10/1:
-password1
-200 OK
-100 SSID 10/2:
-secondwifi
-200 OK
-100 PSWD 10/2:
-password2
-200 OK
-100 SSID 10/3:
-
-200 OK
-100 PSWD 10/3:
-
-....
-
-200 OK Credentials are saved.
-100 HOST:
-192.168.0.200
-200 OK
-*/
 
 // TODO: Unique code for each device. Should be changed before flash!
 #define WIFI_APP_SETTINGS_KEY "KF4GTX9"
@@ -1107,6 +1039,17 @@ password2
 
 void wifi_app_settings(wifi_app_t* app) {
     ESP_ERROR_CHECK( serial_install(UART_NUM_0, ESP_LINE_ENDINGS_CR, ESP_LINE_ENDINGS_CRLF) );
+
+    char * in;
+    while(true) {
+        printf("100 HELLO\n");
+        in = serial_readln();
+        if (!strcmp(in, "HELLO")) break;
+        free(in);
+        printf("300 ERROR Type HELLO\n");
+    }
+    free(in);
+    printf("200 OK\n");
 
     printf("100 KEY\n");
     char* key = serial_readln();
@@ -1118,11 +1061,11 @@ void wifi_app_settings(wifi_app_t* app) {
         for (int i=1; i<=WIFI_CREDENTIALS; i++) {
             printf("200 OK\n");
 
-            printf("100 SSID %d/%d:\n", WIFI_CREDENTIALS, i);
+            printf("100 SSID %d/%d\n", WIFI_CREDENTIALS, i);
             char* ssid = serial_readln();
             printf("200 OK\n");
 
-            printf("100 PSWD %d/%d:\n", WIFI_CREDENTIALS, i);
+            printf("100 PSWD %d/%d\n", WIFI_CREDENTIALS, i);
             char* pswd = serial_readln();
             WIFI_CREDS_SET(app->wifi_creds, i, ssid, pswd);
             free(ssid);
@@ -1131,14 +1074,16 @@ void wifi_app_settings(wifi_app_t* app) {
 
         esp_err_t err = wifi_creds_save(app);
         ESP_OK == err ?             
-            printf("200 OK Credentials are saved.\n") :
+            printf("200 OK\n") :
             printf("300 ERROR Saving credential error: %s\n", esp_err_to_name(err));
 
         if (app->ext->settings_func) app->ext->settings_func(app);
     } else {
         free(key);
-        printf("300 ERROR\n");
+        printf("300 ERROR Key missmatch\n");
     }
+
+    printf("300 Setup process finished\n");
 
     ESP_ERROR_CHECK( serial_uninstall(UART_NUM_0) );
 }
@@ -1167,6 +1112,7 @@ void wifi_app_main(wifi_app_t* app) {
     switch (app->mode) {
         case WIFI_APP_MODE_SETTING:
             wifi_app_settings(app);
+            delay(2000);
             break;
         case WIFI_APP_MODE_RUN:
             // TODO may cam should be initialized here?
@@ -1191,33 +1137,58 @@ void wifi_app_main(wifi_app_t* app) {
 // WEBSOCKET CLIENT APP (settings)
 // ---------------------------------------------------------------
 
-esp_err_t wscli_app_host_save(nvs_handle_t handle, const char* host) {
+esp_err_t wscli_app_host_secret_cid_save(nvs_handle_t handle, const char* host, const char* secret, const char* cid) {
     // Write
     esp_err_t err = nvs_set_str(handle, "host", host);
+    if (err == ESP_OK) err = nvs_set_str(handle, "secret", secret);
+    if (err == ESP_OK) err = nvs_set_str(handle, "cid", cid);
     if (err == ESP_OK) err = nvs_commit(handle);
     
     return err;
 }
 
-esp_err_t wscli_app_host_load(nvs_handle_t handle, char* host, size_t length) {
+esp_err_t wscli_app_host_secret_cid_load(nvs_handle_t handle, char* host, size_t host_length, char* secret, size_t secret_length, char* cid, size_t cid_length) {
     size_t required_size;
     esp_err_t err = nvs_get_str(handle, "host", NULL, &required_size);
     if (err == ESP_OK) {
-        if (required_size >= length) return ESP_ERR_NVS_INVALID_LENGTH;
+        if (required_size >= host_length) return ESP_ERR_NVS_INVALID_LENGTH;
         err = nvs_get_str(handle, "host", host, &required_size);
+    }
+    if (err == ESP_OK) err = nvs_get_str(handle, "secret", NULL, &required_size);
+    if (err == ESP_OK) {
+        if (required_size >= secret_length) return ESP_ERR_NVS_INVALID_LENGTH;
+        err = nvs_get_str(handle, "secret", secret, &required_size);
+    }
+    if (err == ESP_OK) err = nvs_get_str(handle, "cid", NULL, &required_size);
+    if (err == ESP_OK) {
+        if (required_size >= cid_length) return ESP_ERR_NVS_INVALID_LENGTH;
+        err = nvs_get_str(handle, "cid", cid, &required_size);
     }
     return err;
 }
 
 void wscli_app_settings(void* arg) {
     wifi_app_t* app = arg;
-    printf("100 HOST:\n");
+    printf("100 HOST\n");
     char* host = serial_readln();
-    esp_err_t err = wscli_app_host_save(app->nvs_handle, host);
+    printf("200 OK\n");
+    
+    printf("100 SECRET\n");
+    char* secret = serial_readln();
+    printf("200 OK\n");
+    
+    printf("100 CID\n");
+    char* cid = serial_readln();
+    
+    esp_err_t err = wscli_app_host_secret_cid_save(app->nvs_handle, host, secret, cid);
     ESP_OK == err ?             
         printf("200 OK\n") :
-        printf("300 ERROR - %s\n", esp_err_to_name(err));
+        printf("300 ERROR host/secret write error: %s\n", esp_err_to_name(err));
+
     free(host);
+    free(secret);
+    free(cid);
+    
 }
 
 // ---------------------------------------------------------------
@@ -1227,9 +1198,13 @@ void wscli_app_settings(void* arg) {
 
 static TimerHandle_t shutdown_signal_timer;
 static SemaphoreHandle_t shutdown_sema;
+// #define SHOTDOWN_COUNTER_START 3
+// int shutdown_counter = SHOTDOWN_COUNTER_START;
 
 static void wscli_app_shutdown_signaler(TimerHandle_t xTimer)
 {
+//     ESP_LOGI(TAG, "shutdown count: %d", shutdown_counter--);
+//     if (!shutdown_counter) esp_restart();
     xSemaphoreGive(shutdown_sema);
 }
 
@@ -1239,6 +1214,7 @@ static void wscli_app_websocket_event_handler(void *handler_args, esp_event_base
     esp_websocket_event_data_t *data = (esp_websocket_event_data_t *)event_data;
     switch (event_id) {
     case WEBSOCKET_EVENT_CONNECTED:
+//         shutdown_counter = SHOTDOWN_COUNTER_START;
         if (app->ext->on_websock_connected) (app->ext->on_websock_connected)(app);
         break;
     case WEBSOCKET_EVENT_DISCONNECTED:
@@ -1246,6 +1222,12 @@ static void wscli_app_websocket_event_handler(void *handler_args, esp_event_base
         break;
     case WEBSOCKET_EVENT_DATA:
         xTimerReset(shutdown_signal_timer, portMAX_DELAY);
+
+//         ESP_LOGI(TAG, "WEBSOCKET_EVENT_DATA");
+//         ESP_LOGI(TAG, "Received opcode=%d", data->op_code); // 1-text; 2-binary
+//         ESP_LOGW(TAG, "Received=%.*s", data->data_len, (char *)data->data_ptr);
+//         ESP_LOGW(TAG, "Total payload length=%d, data_len=%d, current payload offset=%d\r\n", data->payload_len, data->data_len, data->payload_offset);
+
         if (data->data_len && app->ext->on_websock_data) (app->ext->on_websock_data)(app, data);
         break;
     case WEBSOCKET_EVENT_ERROR:
@@ -1264,12 +1246,15 @@ void wscli_app_websocket_start(wifi_app_t* app) {
                                          pdFALSE, NULL, wscli_app_shutdown_signaler);
     shutdown_sema = xSemaphoreCreateBinary();
 
-    const size_t buff_size = 200;
-    char host_buff[buff_size];
-    char wsuri_buff[buff_size];
-    ESP_ERROR_CHECK( wscli_app_host_load(app->nvs_handle, host_buff, buff_size) );
-    snprintf(wsuri_buff, buff_size, app->ext->wsuri_fmt, host_buff);
+    const size_t buff_host_size = 200;
+    char host_buff[buff_host_size];
+
+    char wsuri_buff[buff_host_size+50];
+
+    ESP_ERROR_CHECK( wscli_app_host_secret_cid_load(app->nvs_handle, host_buff, buff_host_size, app->ext->secret, WSCLI_APP_SECRET_SIZE, app->ext->cid, WSCLI_APP_CID_SIZE) );
+    snprintf(wsuri_buff, buff_host_size+50, app->ext->wsuri_fmt, host_buff);
     app->ext->websocket_cfg.uri = wsuri_buff;
+    app->ext->websocket_cfg.pingpong_timeout_sec = 3;
     
     ESP_LOGI(TAG, "Connecting to %s...", app->ext->websocket_cfg.uri);
 
@@ -1306,6 +1291,22 @@ void wscli_app_loop(void* arg) {
     }
 }
 
+// -------------------------
+
+#define WEBSOCK_SEND_BUFF_SIZE 1000
+char websock_send_buff[WEBSOCK_SEND_BUFF_SIZE];
+
+esp_err_t websock_sendf(esp_websocket_client_handle_t client, const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    int slen = vsnprintf(websock_send_buff, WEBSOCK_SEND_BUFF_SIZE, fmt, args);
+    ESP_LOGI(TAG, "sending: [%s]..", websock_send_buff);
+    if (slen < 0 || slen != esp_websocket_client_send_text(client, websock_send_buff, slen, portMAX_DELAY)) return ESP_FAIL;
+    va_end(args);
+    return ESP_OK;
+}
+
+
 // ------------------------------------------------------
 // WSCLI EVENT HANDLERS
 // ------------------------------------------------------
@@ -1321,14 +1322,16 @@ void wscli_app_on_wifi_disconnected(void* arg) {
 }
 
 void wscli_app_on_websock_connected(void* arg) {
-    // wifi_app_t* app = arg; // using argument as an app
-    // ESP_LOGI(TAG, "----------- [WEBSOCKET CONNECTED] -------------");
+    wifi_app_t* app = arg; // using argument as an app
+    ESP_LOGI(TAG, "----------- [WEBSOCKET CONNECTED] -------------");
+    ESP_ERROR_CHECK_WITHOUT_ABORT( websock_sendf(app->ext->client, "HELLO %s %s", app->ext->secret, app->ext->cid) );
     
 }
 
 void wscli_app_on_websock_disconnected(void* arg) {
-    // wifi_app_t* app = arg; // using argument as an app
-    // ESP_LOGI(TAG, "----------- [WEBSOCKET DISCONNECTED] -------------");
+    wifi_app_t* app = arg; // using argument as an app
+    ESP_LOGI(TAG, "----------- [WEBSOCKET DISCONNECTED] -------------");
+    app->ext->sys->streaming = false;
 }
 
 void wscli_app_on_websock_data(void* arg, esp_websocket_event_data_t* data) {
@@ -1351,7 +1354,7 @@ void wscli_app_on_websock_data(void* arg, esp_websocket_event_data_t* data) {
 
 void wscli_app_on_websock_error(void* arg, esp_websocket_event_data_t* data) {
     // wifi_app_t* app = arg; // using argument as an app
-    // ESP_LOGI(TAG, "----------- [WEBSOCKET ERROR] -------------");
+    ESP_LOGI(TAG, "----------- [WEBSOCKET ERROR] -------------");
 }
 
 void wscli_app_on_websock_loop(void* arg) {
@@ -1389,8 +1392,8 @@ void camsys_app_main(camsys_t* sys)
 {
     wscli_app_t ext;
 
-    ext.no_data_timeout_sec = 10;
-    ext.wsuri_fmt = "ws://%s:8080";
+    ext.no_data_timeout_sec = 3;
+    ext.wsuri_fmt = "ws://%s";
     memset(&ext.websocket_cfg, 0, sizeof(ext.websocket_cfg));
     ext.client = NULL;
 
@@ -1414,7 +1417,8 @@ void app_main() {
     //esp_log_level_set("*", ESP_LOG_NONE);
 
     camsys_t sys;
-    sys.mode = CAMSYS_MODE_MOTION; // CAMSYS_MODE_CAMERA;
+//     sys.mode = CAMSYS_MODE_MOTION;
+    sys.mode = CAMSYS_MODE_CAMERA;
     sys.streaming = false;
 
     camsys_camera_t camera;

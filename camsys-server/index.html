@@ -3,20 +3,85 @@
   <head>
     <meta charset="UTF-8">
     <title>CAMSYS</title>
-    <style>
-      .template {display: none;}
-    </style>
+    <link rel="stylesheet" href="./jquery-ui-themes-1.12.1/jquery-ui.min.css">
   </head>
   <body>
-  
-    <div id="page" class="template">
-      <h1>{{title}}</h1>
-      <div class="body">
-        {{body}}
-      </div>
+    <input type="button" onclick="localStorage.clear()">
+    <div id="device-setup">
+      <h1>Device setup</h1>
+      <input id="key" type="text" placeholder="key">
+      <label>Wi-Fi credentials</label>
+
+      <ul id="wifi-credentials"></ul>
+      <input type="button" value="Add.." onclick="ui.addWifiCredential('', '')">
+
+      <input id="host" type="text" placeholder="Host">
+      <input id="port" type="number" placeholder="Websocket port">
+      <input id="secret" type="password" placeholder="Secret">
+      <select id="mode" placeholder="Default mode">
+        <option value="camera">Camera recorder</option>
+        <option value="motion">Motion detector</option>
+      </select>
+      <select id="com-port"></select>
+
+      <input type="button" value="Set up.." onClick="ui.onSetUpClick()">
     </div>
 
+    <div id="device-list">
+      <h1>Devices</h1>
+      <ul></ul>
+    </div>
+
+  
+    <!--
+    <template id="wifi-credential-tpl">
+      <input type="text" name="ssid_{{ index }}" placeholder="SSID">
+      <input type="password" name="pswd_{{ index }}" placeholder="Password">
+      <br>
+    </template>
+
+    <template id="com-port-opt">
+      {{#each ports }}
+      <option name="path" title="app.getPortInfo({{ this.value }})">{{ path }}</option>
+      {{/each}}
+    </template>
+
+    <template id="setup-device-tpl">
+      <h1>Setup device</h1>
+      <form name="setup-device-frm">
+        {{ wifiCredentials }}
+        <input type="text" name="host" placeholder="Host"><br>
+        <input type="text" name="secret" placeholder="Secret"><br>
+        <input type="text" name="cid" placeholder="Client ID"><br>
+        <select name="mode" placeholder="Default mode">
+          <option value="camera">Camera recorder</option>
+          <option value="motion">Motion detector</option>
+        </select>
+        <select name="comPort"></select>
+      </form>
+    </template>
+    
+    <template id="device-list-tpl">
+      <h1>Devices</h1>
+      <ul>
+        {{#each devices }}
+        <li>
+          active: {{ active }}<br>
+          image: http://{{ ip }}<br>
+          {{#if active }}
+            {{{ image }}}
+          {{/if}}
+        </li>
+        {{/each}}
+      </ul>
+    </template>
+
+    <div id="output"></div>
+    -->
+
     <!-- You can also require other files to run in this process -->
+    <script>window.$ = window.jQuery = require('jquery');</script>
+    <script src="./jquery-ui-1.12.1/jquery-ui.min.js"></script>
     <script src="./renderer.js"></script>
     <script src="./server.js"></script>
   </body>

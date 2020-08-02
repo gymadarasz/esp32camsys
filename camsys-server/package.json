@@ -4,7 +4,8 @@
   "description": "A minimal Electron application",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "install": "electron-rebuild"
   },
   "keywords": [
     "Electron",
@@ -14,11 +15,14 @@
     "demo"
   ],
   "devDependencies": {
-    "electron": "^9.1.1"
+    "electron": "^9.1.1",
+    "electron-rebuild": "^1.11.0"
   },
   "dependencies": {
     "handlebars": "^4.7.6",
     "jquery": "^3.5.1",
+    "jquery-ui": "^1.12.1",
+    "serialport": "^9.0.0",
     "ws": "^7.3.1"
   }
 }
