@@ -1335,13 +1335,32 @@ void wscli_app_on_websock_disconnected(void* arg) {
 }
 
 void wscli_app_on_websock_data(void* arg, esp_websocket_event_data_t* data) {
-    // wifi_app_t* app = arg; // using argument as an app
+    wifi_app_t* app = arg; // using argument as an app
     ESP_LOGI(TAG, "----------- [WEBSOCKET DATA] -------------");
 
     ESP_LOGI(TAG, "WEBSOCKET_EVENT_DATA");
     ESP_LOGI(TAG, "Received opcode=%d", data->op_code); // 1-text; 2-binary
     ESP_LOGW(TAG, "Received=%.*s", data->data_len, (char *)data->data_ptr);
     ESP_LOGW(TAG, "Total payload length=%d, data_len=%d, current payload offset=%d\r\n", data->payload_len, data->data_len, data->payload_offset);
+
+    size_t response_size = 1000;
+    char response_buff[response_size];
+    int outlen = -1;
+    if (!strcmp(data->data_ptr, "?UPDATE")) {
+        camsys_t* sys = app->ext->sys;
+        outlen = snprintf(response_buff, response_size, 
+            "{\"func\":\"update\",\"mode\":\"%s\",\"streaming\":%s,\"camera\":{\"recording\":%s},\"watcher\":{\"x\":%d,\"y\":%d,\"size\":%d,\"raster\":%d,\"threshold\":%d,\"diff_sum_max\":%d}}", 
+            (sys->mode == CAMSYS_MODE_CAMERA ? "camera" : "motion"),
+            (sys->streaming ? "true" : "false"),
+            (sys->camera->file ? "true" : "false"),
+            watcher.x, watcher.y, watcher.size, watcher.raster, watcher.threshold, watcher.diff_sum_max
+        );
+    } else {
+        outlen = snprintf(response_buff, response_size, "Illegal request");
+    }
+    if (-1 >= outlen || -1 >= esp_websocket_client_send_text(app->ext->client, response_buff, outlen, portMAX_DELAY)) {
+        ESP_LOGE(TAG, "Message error");
+    }
 
     // const char* response_fmt = "ECHO: %s\n\0";
     // const size_t response_size = data->data_len + strlen(response_fmt) + 1;

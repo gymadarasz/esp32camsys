@@ -51,6 +51,7 @@ class DeviceList {
 
   remove(cid) {
     var found = false;
+    var index;
     while(index = this.devices.indexOf(cid)) {
       if (index > -1) {
         delete this.devices[index];
@@ -59,6 +60,10 @@ class DeviceList {
       }
     }
     if (found) this.storage.setItem(this.namespace, this.devices);
+  }
+
+  update(cid, info) {
+    this.devices[cid].info = info;
   }
 
 }
@@ -77,7 +82,7 @@ class DeviceServer {
         ws.isAlive = true;
       });
       ws.on('message', (message) => {
-        if (!ws.cid) {
+        if (!ws.cid || this.cid.isAuthMessage(message)) {
           if (ws.cid = cid.auth(message)) this.app.onClientConnected(ws);
           else {
             console.warn('Client auth error');
@@ -85,8 +90,7 @@ class DeviceServer {
             ws.terminate();
             return;
           }
-        }
-        this.app.onClientMessage(ws, message);
+        } else this.app.onClientMessage(ws, JSON.parse(message));
       });
     });
 
@@ -122,9 +126,12 @@ class CId {
   constructor(sys, storage) {
     this.deviceSetup = storage.getItem('device-setup', sys.getDeviceSetupDefaults);
   }
+  isAuthMessage(message) {
+    return /^HELLO [a-zA-Z0-9]{24} [a-zA-Z0-9]{24}$/.test(message);
+  }
   auth(message) {
     // a message could be "HELLO [secret-here] [cid-here]"
-    if (/^HELLO [a-zA-Z0-9]{24} [a-zA-Z0-9]{24}$/.test(message)) {
+    if (this.isAuthMessage(message)) {
       var splits = message.split(' ');
       if (splits[1] == this.deviceSetup.secret) return splits[2];
     }
@@ -155,17 +162,33 @@ class ComPortListener {
 
 
 class App {
+  constructor(devices, ui) {
+    this.devices = devices;
+    this.ui = ui;
+  }
 
   onClientConnected(ws) {
-    devices.add(new Device(ws));
+    this.devices.add(new Device(ws));
+    this.ui.showDeviceList(this.devices);
     console.log('Device connected via websocket:', ws);
   }
   onClientMessage(ws, message) {
     // TODO
     console.log('Message received:', message);
+    var func = message.func;
+    delete message.func;
+    switch (func) {
+      case 'update':
+        this.devices.update(ws.cid, message);
+        this.ui.showDeviceInfo(this.devices, ws.cid);
+        break;
+      default:
+        console.error('Unknown websocket message function: ' + func, 'message:', message);
+    }
   }
   onClientDisconnect(ws) {
-    devices.remove(ws.cid);
+    this.devices.remove(ws.cid);
+    this.ui.showDeviceList(this.devices);
     console.log('Websocket disconnected:', ws);
   }
 
@@ -390,15 +413,82 @@ class UI {
     });
 
   }
+
+  getDeviceInfoCameraAsHtml(camera) {
+    var ret = `
+      <b>camera:</b><br>
+      recording:${camera.recording}<br>
+    `;
+    return ret;
+  }
+  getDeviceInfoMotionAsHtml(watcher) {
+    var ret = `
+      <b>motion:</b><br>
+      watcher:<br>
+      diff_sum_max: ${watcher.diff_sum_max}<br>
+      raster: ${watcher.raster}<br>
+      size: ${watcher.size}<br>
+      threshold: ${watcher.threshold}<br>
+      x: ${watcher.x}<br>
+      y: ${watcher.y}<br>
+    `;
+    return ret;
+  }
+
+  getDeviceInfoAsHtml(info) {
+    var deviceModeInfo = info.mode == 'camera' ? 
+      this.getDeviceInfoCameraAsHtml(info.camera) : 
+      this.getDeviceInfoMotionAsHtml(info.watcher);
+    var ret = `      
+      mode: ${info.mode}<br>
+      ---------<br>
+      ${deviceModeInfo}
+      ---------<br>
+      streaming: ${info.streaming}<br>
+    `;
+    return ret;
+  }
+
+  getDeviceAsHtml(device) {
+    console.log(device);
+    var status = device.ws.isAlive ? 'connected' : 'disconnected';
+    return `
+      <li id="device-${device.ws.cid}" class="device ${status}">
+        <b>device:</b>
+        cid: ${device.ws.cid}<br>
+        IP: ${device.ws.ip4}<br>
+        status: ${status}<br>
+        <div class="device-info"></div>
+      </li>`;
+  }
+
+  showDeviceList(deviceList) {
+    var deviceListHtml = '';
+
+    for(var key in deviceList.devices) {
+      var device = deviceList.devices[key];
+      console.log('DEVICE:', key, device);
+      device.ws.send('?UPDATE\0');
+      deviceListHtml += this.getDeviceAsHtml(device);
+    }
+
+    $('#device-list ul').html(deviceListHtml);
+  }
+
+  showDeviceInfo(deviceList, cid) {
+    $('#device-' + cid + ' .device-info').html(
+      this.getDeviceInfoAsHtml(deviceList.devices[cid].info)
+    );
+  }
 }
 
 
 const storage = new Storage();
 const ser = new SerialCom();
 const sys = new System();
-const app = new App();
 const ui = new UI(ser, sys, storage);
 const devices = new DeviceList(storage, 'DeviceList');
+const app = new App(devices, ui);
 const cid = new CId(sys, storage);
 const serl = new ComPortListener(ser, ui.onComPortsChanged);
 const wss = new WebSocket.Server({port: ui.getDeviceSetup().port});
