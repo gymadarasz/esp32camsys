@@ -50,16 +50,7 @@ class DeviceList {
   }
 
   remove(cid) {
-    var found = false;
-    var index;
-    while(index = this.devices.indexOf(cid)) {
-      if (index > -1) {
-        delete this.devices[index];
-        this.devices.splice(index, 1);
-        found = true;
-      }
-    }
-    if (found) this.storage.setItem(this.namespace, this.devices);
+    console.log('disconnected:', this.devices[cid]); // TODO
   }
 
   update(cid, info) {
@@ -92,6 +83,7 @@ class DeviceServer {
           }
         } else this.app.onClientMessage(ws, JSON.parse(message));
       });
+
     });
 
     this.wss.pingInterval = setInterval(() => {
@@ -338,7 +330,7 @@ class UI {
        result += characters.charAt(Math.floor(Math.random() * charactersLength));
     }
     return result;
- }
+  }
 
   onSetUpClick() {
     var key = $('#key').val();
@@ -435,16 +427,25 @@ class UI {
     return ret;
   }
 
+  getNow() {
+    if (!Date.now) {
+      Date.now = function() { return new Date().getTime(); }
+    }
+    return Date.now() / 1000 | 0;
+  }
+
   getDeviceInfoAsHtml(info) {
+    var now = this.getNow();
     var deviceModeInfo = info.mode == 'camera' ? 
       this.getDeviceInfoCameraAsHtml(info.camera) : 
       this.getDeviceInfoMotionAsHtml(info.watcher);
-    var ret = `      
+    var ret = `
       mode: ${info.mode}<br>
       ---------<br>
       ${deviceModeInfo}
       ---------<br>
       streaming: ${info.streaming}<br>
+      Last updated: <span class="last-updated">${now}</span>
     `;
     return ret;
   }
@@ -459,20 +460,67 @@ class UI {
         IP: ${device.ws.ip4}<br>
         status: ${status}<br>
         <div class="device-info"></div>
+
+        Stream: <img class="stream" src=""><br>
+
+        <input type="button" onclick="ui.startStream(app.devices.devices['${device.ws.cid}'])" value="start stream">
+        <br>
+        <input type="button" onclick="ui.stopStream(app.devices.devices['${device.ws.cid}'])" value="stop stream/record">
+        <br>
+
+        Record: <img class="record" src="">
+        <br>
+
+        <input type="button" onclick="ui.startRecord(app.devices.devices['${device.ws.cid}'])" value="start record">
+        <input type="button" onclick="ui.replayRecord(app.devices.devices['${device.ws.cid}'])" value="replay record">
+        <input type="button" onclick="ui.deleteRecord(app.devices.devices['${device.ws.cid}'])" value="delete record">
+        <br>
+
+        <input type="button" onclick="ui.updateDevice(app.devices.devices['${device.ws.cid}'])" value="update"><br>
       </li>`;
   }
 
-  showDeviceList(deviceList) {
-    var deviceListHtml = '';
+  startStream(device) {
+    $('#device-' + device.ws.cid + ' .stream').attr('src', 'http://' + device.ws.ip4 + '/stream?secret=' + this.getDeviceSetup(sys.getDeviceSetupDefaults).secret + '&ts=' + this.getNow());
+  }
 
+  replayRecord(device) {
+    $('#device-' + device.ws.cid + ' .record').attr('src', 'http://' + device.ws.ip4 + '/replay?secret=' + this.getDeviceSetup(sys.getDeviceSetupDefaults).secret + '&ts=' + this.getNow());
+  }
+
+  stopStream(device) {
+    device.ws.send('!STREAM STOP\0');
+  }
+
+  startRecord(device) {
+    device.ws.send('!RECORD START\0');
+  }
+
+  stopRecord(device) {
+    device.ws.send('!RECORD STOP\0');
+  }
+
+  deleteRecord(device) {
+    device.ws.send('!RECORD DELETE\0');
+  }
+
+  updateDevice(device) {
+    device.ws.send('?UPDATE\0');
+    return this.getDeviceAsHtml(device);
+  }
+
+  updateDevices(deviceList) {
+    var deviceListHtml = '';
     for(var key in deviceList.devices) {
       var device = deviceList.devices[key];
-      console.log('DEVICE:', key, device);
-      device.ws.send('?UPDATE\0');
-      deviceListHtml += this.getDeviceAsHtml(device);
+      deviceListHtml += this.updateDevice(device);
     }
+    return deviceListHtml;
+  }
 
-    $('#device-list ul').html(deviceListHtml);
+
+  showDeviceList(deviceList) {
+    $('#device-list ul').html(this.updateDevices(deviceList));
   }
 
   showDeviceInfo(deviceList, cid) {

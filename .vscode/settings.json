@@ -29,6 +29,8 @@
         "fstream": "c",
         "cstdlib": "c",
         "cstring": "c",
-        "cassert": "c"
+        "cassert": "c",
+        "vector": "c",
+        "sstream": "c"
     }
 }
