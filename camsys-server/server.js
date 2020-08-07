@@ -311,7 +311,7 @@ class UI {
     this.sys = sys;
     this.storage = storage;
     var deviceSetup = this.getDeviceSetup(sys.getDeviceSetupDefaults);
-    if (!deviceSetup.wifiCredentials.length) this.addWifiCredential('', '');
+    if (!deviceSetup.wifiCredentials || !deviceSetup.wifiCredentials.length) this.addWifiCredential('', '');
     else deviceSetup.wifiCredentials.forEach((cred) => {
       this.addWifiCredential(cred.ssid, cred.pswd);
     });
