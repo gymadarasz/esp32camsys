@@ -539,5 +539,5 @@ const devices = new DeviceList(storage, 'DeviceList');
 const app = new App(devices, ui);
 const cid = new CId(sys, storage);
 const serl = new ComPortListener(ser, ui.onComPortsChanged);
-const wss = new WebSocket.Server({port: ui.getDeviceSetup(sys.getDeviceSetupDefaults).port});
+const wss = new WebSocket.Server({port: sys.getDeviceSetupDefaults().port});
 const srv = new DeviceServer(app, wss, cid);
