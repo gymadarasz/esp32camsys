@@ -318,7 +318,7 @@ class UI {
     $('#host').autocomplete({source: sys.getIpAddresses()});
     $('#host').val(deviceSetup.host);
     $('#port').val(deviceSetup.port);
-    $('#secret').val(deviceSetup.secret);
+    $('#secret').val((deviceSetup.secret && deviceSetup.secret.length == 24) ? deviceSetup.secret : this.makeid(24));
     $('#mode').val(deviceSetup.mode);
   }
 
