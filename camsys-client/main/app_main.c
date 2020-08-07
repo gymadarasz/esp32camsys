@@ -574,6 +574,7 @@ void camsys_camera_init(bool mode, bool power_up) {
 // --- nvs ---
 
 esp_err_t camsys_app_mode_save(nvs_handle_t handle, uint8_t mode) {
+    ESP_LOGE(TAG, "mode set to %d", mode);
     esp_err_t err = nvs_set_u8(handle, "mode", mode);
     if (err == ESP_OK) err = nvs_commit(handle);
     return err;
@@ -751,10 +752,75 @@ esp_err_t camsys_camera_httpd_stream_replay_handler(wifi_app_t* app, httpd_req_t
 }
 
 
+#define MOTION_PART_BOUNDARY "123456789000000000000987654321"
+static const char* MOTION__STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" MOTION_PART_BOUNDARY;
+static const char* MOTION__STREAM_BOUNDARY = "\r\n--" MOTION_PART_BOUNDARY "\r\n";
+static const char* MOTION__STREAM_PART = "Content-Type: image/x-windows-bmp\r\nContent-Length: %u\r\n\r\n";
+
+camera_fb_t* motion_fb = NULL;
+
+esp_err_t camsys_motion_httpd_image_handler(wifi_app_t* app, httpd_req_t* req) {
+    camera_fb_t * fb = motion_fb;
+    esp_err_t res = ESP_OK;
+    size_t _bmp_buf_len;
+    uint8_t * _bmp_buf;
+    char * part_buf[64];
+
+    res = httpd_resp_set_type(req, MOTION__STREAM_CONTENT_TYPE);
+    if(res != ESP_OK){
+        return res;
+    }
+
+    app->ext->sys->streaming = true;
+
+    while(app->ext->sys->streaming) {
+        if (!fb) {
+            fb = esp_camera_fb_get();
+        }
+        if (!fb) {
+            ESP_LOGE("camsys", "Camera capture failed");
+            res = ESP_FAIL;
+            break;
+        }
+        
+        bool bmp_converted = frame2bmp(fb, &_bmp_buf, &_bmp_buf_len);
+        if(!bmp_converted){
+            ESP_LOGE("camsys", "BMP compression failed");
+            esp_camera_fb_return(fb);
+            res = ESP_FAIL;
+        }
+
+
+        if(res == ESP_OK){
+            res = httpd_resp_send_chunk(req, MOTION__STREAM_BOUNDARY, strlen(MOTION__STREAM_BOUNDARY));
+        }
+        if(res == ESP_OK){
+            size_t hlen = snprintf((char *)part_buf, 64, MOTION__STREAM_PART, _bmp_buf_len);
+
+            res = httpd_resp_send_chunk(req, (const char *)part_buf, hlen);
+        }
+        if(res == ESP_OK){
+            res = httpd_resp_send_chunk(req, (const char *)_bmp_buf, _bmp_buf_len);
+        }
+        if(fb->format != PIXFORMAT_JPEG){
+            free(_bmp_buf);
+        }
+        // esp_camera_fb_return(fb);
+        if(res != ESP_OK){
+            break;
+        }
+    }
+
+    app->ext->sys->streaming = false;
+
+    return res;
+}
+
 esp_err_t camsys_httpd_stream_replay_handler(httpd_req_t* req, bool replay) {
     wifi_app_t* app = _app;
     if (!camsys_check_secret(app, req)) return ESP_FAIL;
     if (app->ext->sys->mode == CAMSYS_MODE_CAMERA) return camsys_camera_httpd_stream_replay_handler(app, req, replay);
+    if (app->ext->sys->mode == CAMSYS_MODE_MOTION) return camsys_motion_httpd_image_handler(app, req);
     ESP_ERROR_CHECK( httpd_resp_send_404(req) );
     return ESP_OK;
 }
@@ -806,6 +872,23 @@ void camsys_httpd_server_init(wifi_app_t* app)
     // If server failed to start, handle will be NULL
 }
 
+
+// -------------------------
+
+#define WEBSOCK_SEND_BUFF_SIZE 1000
+char websock_send_buff[WEBSOCK_SEND_BUFF_SIZE];
+
+esp_err_t websock_sendf(esp_websocket_client_handle_t client, const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    int slen = vsnprintf(websock_send_buff, WEBSOCK_SEND_BUFF_SIZE, fmt, args);
+    //ESP_LOGI(TAG, "sending: [%s]..", websock_send_buff);
+    if (slen < 0 || slen != esp_websocket_client_send_text(client, websock_send_buff, slen, portMAX_DELAY)) return ESP_FAIL;
+    va_end(args);
+    return ESP_OK;
+}
+
+
 // ----------------- camera/motion websocket loops ---------------------
 
 void camsys_camera_websock_loop(wifi_app_t* app) {
@@ -847,11 +930,15 @@ void watcher_show_diff(size_t diff_sum, bool alert) {
     ESP_LOGI(TAG, "%s", sbuff);
 }
 
+bool camsys_motion_websock_loop_first = true;
 void camsys_motion_websock_loop(wifi_app_t* app) {
     // TODO ...
-    camera_fb_t* fb = camsys_fb_get(app);            
+    camera_fb_t* fb = motion_fb;
+
+    fb = camsys_fb_get(app);            
     if (!fb) {
         ESP_LOGE(TAG, "Motion Camera capture failed");
+        ESP_ERROR_CHECK( camsys_fb_return(fb) );
         return;
     }
     
@@ -877,12 +964,15 @@ void camsys_motion_websock_loop(wifi_app_t* app) {
 
     if (watcher.diff_sum_max < diff_sum) watcher.diff_sum_max = diff_sum;
     
-    bool alert = diff_sum >= watcher.threshold;
+    bool alert = !camsys_motion_websock_loop_first && diff_sum >= watcher.threshold;
+    camsys_motion_websock_loop_first = false;
+
     watcher_show_diff(diff_sum, alert);
     if (alert) {
         // PRINT("******************************************************");
         // PRINT("*********************** [ALERT] **********************");
         // PRINT("******************************************************");
+        ESP_ERROR_CHECK( websock_sendf(app->ext->client, "{\"func\":\"alert\"}") );
     }
     
     ESP_ERROR_CHECK( camsys_fb_return(fb) );
@@ -1198,7 +1288,7 @@ void wifi_app_main(wifi_app_t* app) {
 
     // TODO may cam should be initialized here?
 
-    uint8_t mode = CAMSYS_MODE_CAMERA;
+    uint8_t mode = CAMSYS_MODE_MOTION;
     switch (app->mode) {
         case WIFI_APP_MODE_SETTING:
             wifi_app_settings(app);
@@ -1207,6 +1297,8 @@ void wifi_app_main(wifi_app_t* app) {
         case WIFI_APP_MODE_RUN:
             ESP_ERROR_CHECK( camsys_app_mode_load(app->nvs_handle, &mode) );
             app->ext->sys->mode = (bool)mode;
+
+            ESP_LOGI(TAG, "mode load from settings: %d", (uint8_t)app->ext->sys->mode);
 
             // TODO may cam should be initialized here?
             camsys_camera_init(app->ext->sys->mode, true);
@@ -1398,21 +1490,6 @@ void wscli_app_loop(void* arg) {
     }
 }
 
-// -------------------------
-
-#define WEBSOCK_SEND_BUFF_SIZE 1000
-char websock_send_buff[WEBSOCK_SEND_BUFF_SIZE];
-
-esp_err_t websock_sendf(esp_websocket_client_handle_t client, const char* fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    int slen = vsnprintf(websock_send_buff, WEBSOCK_SEND_BUFF_SIZE, fmt, args);
-    ESP_LOGI(TAG, "sending: [%s]..", websock_send_buff);
-    if (slen < 0 || slen != esp_websocket_client_send_text(client, websock_send_buff, slen, portMAX_DELAY)) return ESP_FAIL;
-    va_end(args);
-    return ESP_OK;
-}
-
 
 // ------------------------------------------------------
 // WSCLI EVENT HANDLERS
@@ -1457,12 +1534,16 @@ void wscli_app_on_websock_data(void* arg, esp_websocket_event_data_t* data) {
     if (!strcmp(data->data_ptr, "?UPDATE")) {
 
         camsys_t* sys = app->ext->sys;
+
+        size_t diff_sum_max = watcher.diff_sum_max;
+        watcher.diff_sum_max = 0;
+        
         outlen = snprintf(response_buff, response_size, 
             "{\"func\":\"update\",\"mode\":\"%s\",\"streaming\":%s,\"camera\":{\"recording\":%s},\"watcher\":{\"x\":%d,\"y\":%d,\"size\":%d,\"raster\":%d,\"threshold\":%d,\"diff_sum_max\":%d}}", 
             (sys->mode == CAMSYS_MODE_CAMERA ? "camera" : "motion"),
             (sys->streaming ? "true" : "false"),
             (sys->camera->file ? "true" : "false"),
-            watcher.x, watcher.y, watcher.size, watcher.raster, watcher.threshold, watcher.diff_sum_max
+            watcher.x, watcher.y, watcher.size, watcher.raster, watcher.threshold, diff_sum_max
         );
 
     } else if (!strcmp(data->data_ptr, "!STREAM STOP")) {
@@ -1572,8 +1653,8 @@ void app_main() {
     //esp_log_level_set("*", ESP_LOG_NONE);
 
     camsys_t sys;
-    sys.mode = CAMSYS_MODE_MOTION;
-    sys.mode = CAMSYS_MODE_CAMERA;
+    // sys.mode = CAMSYS_MODE_MOTION;
+    // sys.mode = CAMSYS_MODE_CAMERA;
     sys.streaming = false;
 
     camsys_camera_t camera;
