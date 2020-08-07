@@ -293,7 +293,7 @@ class System {
       wifiCredentials: [],
       host: this.getIpAddresses()[0],
       port: 4443,
-      secret: this.makeid(24),
+      secret: ui.makeid(24),
       mode: 'motion',
     }
   }
