@@ -278,6 +278,13 @@ void sdcard_close() {
 // STRING EXTRAS
 // ---------------------------------------------------------------
 
+bool str_starts_with(const char *pre, const char *str)
+{
+    size_t lenpre = strlen(pre),
+           lenstr = strlen(str);
+    return lenstr < lenpre ? false : memcmp(pre, str, lenpre) == 0;
+}
+
 char* strncpy_offs(char* dest, size_t offs, const char* src, size_t max) {
     int i=0;
     for (; i+offs<max; i++) {
@@ -931,6 +938,7 @@ void watcher_show_diff(size_t diff_sum, bool alert) {
 }
 
 bool camsys_motion_websock_loop_first = true;
+bool camsys_motion_websock_loop_alert = false;
 void camsys_motion_websock_loop(wifi_app_t* app) {
     // TODO ...
     camera_fb_t* fb = motion_fb;
@@ -964,15 +972,16 @@ void camsys_motion_websock_loop(wifi_app_t* app) {
 
     if (watcher.diff_sum_max < diff_sum) watcher.diff_sum_max = diff_sum;
     
-    bool alert = !camsys_motion_websock_loop_first && diff_sum >= watcher.threshold;
+    if (!camsys_motion_websock_loop_alert) 
+        camsys_motion_websock_loop_alert = !camsys_motion_websock_loop_first && diff_sum >= watcher.threshold;
     camsys_motion_websock_loop_first = false;
 
-    watcher_show_diff(diff_sum, alert);
-    if (alert) {
+    watcher_show_diff(diff_sum, camsys_motion_websock_loop_alert);
+    if (camsys_motion_websock_loop_alert) {
         // PRINT("******************************************************");
         // PRINT("*********************** [ALERT] **********************");
         // PRINT("******************************************************");
-        ESP_ERROR_CHECK( websock_sendf(app->ext->client, "{\"func\":\"alert\"}") );
+        if (ESP_OK == websock_sendf(app->ext->client, "{\"func\":\"alert\"}") ) camsys_motion_websock_loop_alert = false;
     }
     
     ESP_ERROR_CHECK( camsys_fb_return(fb) );
@@ -1568,6 +1577,32 @@ void wscli_app_on_websock_data(void* arg, esp_websocket_event_data_t* data) {
         esp_err_t err = camera_recording_delete(app->ext->sys->camera);
         if (err != ESP_OK) outlen = snprintf(response_buff, response_size, "{\"func\":\"err\",\"msg\":\"record delete error: '%d'\"}", err);
         else outlen = snprintf(response_buff, response_size, "{\"func\":\"msg\",\"msg\":\"record deleted\"}");
+
+    } else if (str_starts_with(data->data_ptr, "!WATCH ")) {
+        char buff[100];
+        strncpy_offs(buff, strlen("!WATCH "), data->data_ptr, 99);
+        ESP_LOGI(TAG, "watch data: '%s'", buff);
+        
+        int i = 0; // TODO make a function
+        int alen = 5;
+        const char* tok = "/";
+        char *p = strtok (buff, tok);
+        char *array[alen];
+
+        while (p != NULL && i<alen)
+        {
+            array[i++] = p;
+            p = strtok (NULL, tok);
+        }
+
+        watcher.x = atoi(array[0]); // TODO outsource into a sep function
+        watcher.y = atoi(array[1]);
+        watcher.size = atoi(array[2]);
+        watcher.raster = atoi(array[3]);
+        watcher.threshold = atoi(array[4]);
+        watcher.diff_sum_max = 0;
+        camsys_motion_websock_loop_first = true;
+        camsys_motion_websock_loop_alert = false;
 
     } else {
 

@@ -116,7 +116,7 @@ class DeviceServer {
 
 class CId {
   constructor(sys, storage) {
-    this.deviceSetup = storage.getItem('device-setup', sys.getDeviceSetupDefaults);
+    this.deviceSetup = storage.getItem('device-setup', sys.getDeviceSetupDefaults());
   }
   isAuthMessage(message) {
     return /^HELLO [a-zA-Z0-9]{24} [a-zA-Z0-9]{24}$/.test(message);
@@ -188,6 +188,10 @@ class App {
 
 class SerialCom {
 
+  constructor(sys) {
+    this.sys = sys;
+  }
+
   open(path, options) {
     const port = new SerialPort(path, options);
     const parser = new Readline();
@@ -255,7 +259,7 @@ class SerialCom {
       } else if (data.startsWith('100 SECRET')) {        
         this.serialWrite(serial.port, deviceSetup.secret + "\n");
       } else if (data.startsWith('100 CID')) {        
-        this.serialWrite(serial.port, ui.makeid(24) + "\n");
+        this.serialWrite(serial.port, this.sys.makeid(24) + "\n");
       } else if (data.startsWith('100 MODE')) {        
         this.serialWrite(serial.port, deviceSetup.mode + "\n");
       } else if (data.startsWith('300')) {
@@ -277,6 +281,24 @@ class SerialCom {
 
 
 class System {
+  constructor() {
+    this.deviceSetupDefaults = {
+      wifiCredentials: [],
+      host: this.getIpAddresses()[0],
+      port: 4443,
+      secret: this.makeid(24),
+      mode: 'motion',
+    };
+  }
+  makeid(length) {
+    var result           = '';
+    var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    var charactersLength = characters.length;
+    for ( var i = 0; i < length; i++ ) {
+      result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
+    return result;
+  }
   getIpAddresses() {
     var ifaces = os.networkInterfaces();
     var ips = [];
@@ -288,14 +310,9 @@ class System {
     });
     return ips;
   }
+  
   getDeviceSetupDefaults() {
-    return {
-      wifiCredentials: [],
-      host: this.getIpAddresses()[0],
-      port: 4443,
-      secret: ui.makeid(24),
-      mode: 'motion',
-    }
+    return this.deviceSetupDefaults;
   }
   
 }
@@ -310,26 +327,17 @@ class UI {
     this.ser = ser;
     this.sys = sys;
     this.storage = storage;
-    var deviceSetup = this.getDeviceSetup(sys.getDeviceSetupDefaults);
+    var deviceSetup = this.getDeviceSetup(sys.getDeviceSetupDefaults());
     if (!deviceSetup.wifiCredentials || !deviceSetup.wifiCredentials.length) this.addWifiCredential('', '');
     else deviceSetup.wifiCredentials.forEach((cred) => {
       this.addWifiCredential(cred.ssid, cred.pswd);
     });
-    $('#host').autocomplete({source: sys.getIpAddresses()});
-    $('#host').val(deviceSetup.host);
-    $('#port').val(deviceSetup.port);
-    $('#secret').val((deviceSetup.secret && deviceSetup.secret.length == 24) ? deviceSetup.secret : this.makeid(24));
-    $('#mode').val(deviceSetup.mode);
-  }
-
-  makeid(length) {
-    var result           = '';
-    var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    var charactersLength = characters.length;
-    for ( var i = 0; i < length; i++ ) {
-       result += characters.charAt(Math.floor(Math.random() * charactersLength));
-    }
-    return result;
+    var ips = sys.getIpAddresses();
+    $('#host').autocomplete({source: ips});
+    $('#host').val(deviceSetup.host ? deviceSetup.host : ips[0]);
+    $('#port').val(deviceSetup.port ? deviceSetup.port : sys.getDeviceSetupDefaults().port);
+    $('#secret').val((deviceSetup.secret && deviceSetup.secret.length == 24) ? deviceSetup.secret : sys.getDeviceSetupDefaults().secret);
+    $('#mode').val(deviceSetup.mode ? deviceSetup.mode : sys.getDeviceSetupDefaults().mode);
   }
 
   onSetUpClick() {
@@ -370,11 +378,12 @@ class UI {
         break;
       }
     }
-    $('#wifi-credentials').append(`<li id="wifi-credential-${i}">
-      <input id="ssid-${i}" class="ssid" type="text" placeholder="ssid" value="${ssid}">
-      <input id="pswd-${i}" class="pswd" type="password" placeholder="password" value="${pswd}">
-      <input type="button" value="Remove" onclick="ui.removeWifiCredential(${i})">
-    </li>`);
+    $('#wifi-credentials').append(
+      `<li id="wifi-credential-${i}">
+        <input id="ssid-${i}" class="ssid" type="text" placeholder="ssid" value="${ssid}">
+        <input id="pswd-${i}" class="pswd" type="password" placeholder="password" value="${pswd}">
+        <input type="button" value="Remove" onclick="ui.removeWifiCredential(${i})">
+      </li>`);
   }
 
   removeWifiCredential(i) {
@@ -476,16 +485,20 @@ class UI {
         <input type="button" onclick="ui.deleteRecord(app.devices.devices['${device.ws.cid}'])" value="delete record">
         <br>
 
-        <input type="button" onclick="ui.updateDevice(app.devices.devices['${device.ws.cid}'])" value="update"><br>
+        <input type="button" onclick="ui.updateDevice(app.devices.devices['${device.ws.cid}'])" value="update">
+        <br>
+        
+        Motion: <input type="text" value="43,43,10,5,250" onclick="ui.updateMotion(app.devices.devices['${device.ws.cid}'], this.value)"> (x,y,size,raster,threshold)
+        <br>
       </li>`;
   }
 
   startStream(device) {
-    $('#device-' + device.ws.cid + ' .stream').attr('src', 'http://' + device.ws.ip4 + '/stream?secret=' + this.getDeviceSetup(sys.getDeviceSetupDefaults).secret + '&ts=' + this.getNow());
+    $('#device-' + device.ws.cid + ' .stream').attr('src', 'http://' + device.ws.ip4 + '/stream?secret=' + this.getDeviceSetup(sys.getDeviceSetupDefaults()).secret + '&ts=' + this.getNow());
   }
 
   replayRecord(device) {
-    $('#device-' + device.ws.cid + ' .record').attr('src', 'http://' + device.ws.ip4 + '/replay?secret=' + this.getDeviceSetup(sys.getDeviceSetupDefaults).secret + '&ts=' + this.getNow());
+    $('#device-' + device.ws.cid + ' .record').attr('src', 'http://' + device.ws.ip4 + '/replay?secret=' + this.getDeviceSetup(sys.getDeviceSetupDefaults()).secret + '&ts=' + this.getNow());
   }
 
   stopStream(device) {
@@ -518,6 +531,12 @@ class UI {
     return deviceListHtml;
   }
 
+  updateMotion(device, valuestr) {
+    var msg = '!WATCH ' + valuestr + '\0';
+    console.log(msg);
+    device.ws.send(msg);
+  }
+
 
   showDeviceList(deviceList) {
     $('#device-list ul').html(this.updateDevices(deviceList));
@@ -532,8 +551,8 @@ class UI {
 
 
 const storage = new Storage();
-const ser = new SerialCom();
 const sys = new System();
+const ser = new SerialCom(sys);
 const ui = new UI(ser, sys, storage);
 const devices = new DeviceList(storage, 'DeviceList');
 const app = new App(devices, ui);
