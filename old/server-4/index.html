@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>CAMSYS</title>
+    <link rel="stylesheet" href="./jquery-ui-themes-1.12.1/jquery-ui.min.css">
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <!-- PRELOADER -->
+    <div class="preloader"></div>
+    <!-- /PRELOADER -->
+
+    <div>[MENU]</div>
+
+    <!-- MOTION DETECTORS -->
+    <ul class="motion-device-list"></ul>
+    <!-- /MOTION DETECTORS -->
+
+    <!-- MOTION DETECTOR SETTINGS -->
+    <ul class="motion-device-settings"></ul>
+    <!-- /MOTION DETECTOR SETTINGS -->
+
+
+
+    <!-- HIDDEN UI -->
+    <div>
+      <hr>
+      <input type="button" onclick="localStorage.clear()">
+
+      <div id="device-list">
+        <h1>Devices</h1>
+        <ul></ul>
+      </div>
+      
+      <div id="device-setup">
+        <h1>Device setup</h1>
+        <input id="key" type="text" placeholder="key">
+        <label>Wi-Fi credentials</label>
+
+        <ul id="wifi-credentials"></ul>
+        <input type="button" value="Add.." onclick="ui.addWifiCredential('', '')">
+
+        <input id="host" type="text" placeholder="Host">
+        <input id="port" type="number" placeholder="Websocket port">
+        <input id="secret" type="password" placeholder="Secret">
+        <select id="mode" placeholder="Default mode">
+          <option value="camera">Camera recorder</option>
+          <option value="motion">Motion detector</option>
+        </select>
+        <select id="com-port"></select>
+
+        <input type="button" value="Set up.." onClick="ui.onSetUpClick()">
+      </div>
+    </div>
+    <!-- /HIDDEN UI -->
+    
+    <!-- You can also require other files to run in this process -->
+    <script>window.$ = window.jQuery = require('jquery');</script>
+    <script src="./jquery-ui-1.12.1/jquery-ui.min.js"></script>
+    <script src="./renderer.js"></script>
+    <script src="./server.js"></script>
+  </body>
+</html>

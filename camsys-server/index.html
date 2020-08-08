@@ -11,49 +11,63 @@
     <div class="preloader"></div>
     <!-- /PRELOADER -->
 
-    <div>[MENU]</div>
+    <div class="menu">
+      <ul>
+        <li><a href="javascript:void(0);" onclick="menu.onDeviceSettingsClick()">Device Settings</a></li>
+        <li><a href="javascript:void(0);" onclick="menu.onDeviceListClick()">Device List</a></li>
+      </ul>
+      <div class="clear"></div>
+    </div>
 
-    <!-- MOTION DETECTORS -->
-    <ul class="motion-device-list"></ul>
-    <!-- /MOTION DETECTORS -->
+    <div class="page device-settings">
+      <form name="device-settings-form">
 
-    <!-- MOTION DETECTOR SETTINGS -->
-    <ul class="motion-device-settings"></ul>
-    <!-- /MOTION DETECTOR SETTINGS -->
+        <h3 class="center">Device settings</h3>
+        <br>
 
+        <label>Key</label>
+        <input name="key" type="text" placeholder="Key">
+        <br>
 
-
-    <!-- HIDDEN UI -->
-    <div>
-      <hr>
-      <input type="button" onclick="localStorage.clear()">
-
-      <div id="device-list">
-        <h1>Devices</h1>
-        <ul></ul>
-      </div>
-      
-      <div id="device-setup">
-        <h1>Device setup</h1>
-        <input id="key" type="text" placeholder="key">
         <label>Wi-Fi credentials</label>
+        <input type="button" value="Add.." onclick="deviceSettingsForm.onWifiCredentialAddClick()">
+        <br>
+        <label>&nbsp;</label>
+        <ul class="wifi-credentials"></ul>
+        <div class="clear"></div>
 
-        <ul id="wifi-credentials"></ul>
-        <input type="button" value="Add.." onclick="ui.addWifiCredential('', '')">
+        <label>Host</label>
+        <input name="host" type="text" placeholder="Host">
+        <br>
 
-        <input id="host" type="text" placeholder="Host">
-        <input id="port" type="number" placeholder="Websocket port">
-        <input id="secret" type="password" placeholder="Secret">
-        <select id="mode" placeholder="Default mode">
+        <label>Websocket port</label>
+        <input name="port" type="number" placeholder="Websocket port">
+        <br>
+
+        <label>Secret</label>
+        <input name="secret" type="password" placeholder="Secret">
+        <br>
+
+        <label>Mode</label>
+        <select name="mode" placeholder="Mode">
           <option value="camera">Camera recorder</option>
           <option value="motion">Motion detector</option>
         </select>
-        <select id="com-port"></select>
+        <br>
 
-        <input type="button" value="Set up.." onClick="ui.onSetUpClick()">
-      </div>
+        <label>COM Port</label>
+        <select name="path"></select>
+        <br>
+
+        <br>
+        <div class="left">
+          <input type="button" value="Set up.." onclick="deviceSettingsForm.onSetupClick()">
+        </div>
+      </form>
     </div>
-    <!-- /HIDDEN UI -->
+
+    <div class="page device-list">[Device List]</div>
+
     
     <!-- You can also require other files to run in this process -->
     <script>window.$ = window.jQuery = require('jquery');</script>
