@@ -10,8 +10,7 @@ const Readline = require('@serialport/parser-readline')
 
 const os = require('os');
 
-
-
+// ----------------------- Storage ------------------------------
 
 class Storage {
 
@@ -26,6 +25,282 @@ class Storage {
   }
 
 }
+
+const storage = new Storage();
+
+// ----------------------- Counter ------------------------------
+
+class Counter {
+  constructor(namespace) {
+    this.namespace = namespace ? namespace : '';
+    this.next = storage.getItem(namespace + '-counter', 1);
+  }
+  getNext() {
+    var ret = this.next;
+    this.next++;
+    storage.setItem(namespace + '-counter', this.next);
+    return ret;
+  }
+}
+
+const counter = new Counter;
+
+// ----------------- Timestamp ---------------------
+
+class Timestamp {
+  constructor() {
+    if (!Date.now) {
+      Date.now = function() { return new Date().getTime(); }
+    }
+  }
+  now() {
+    return Date.now() / 1000 | 0;
+  }
+}
+
+const timestamp = new Timestamp();
+
+// ------------------- IDMaker ---------------------
+
+class UID {
+  makeid(length) {
+    var result           = '';
+    var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    var charactersLength = characters.length;
+    for ( var i = 0; i < length; i++ ) {
+      result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
+    return result;
+  }
+}
+
+const uid = new UID();
+
+// ------------------- Network ---------------------
+
+class Network {
+
+  getIpAddresses() {
+    var ifaces = os.networkInterfaces();
+    var ips = [];
+    Object.keys(ifaces).forEach(function (ifname) {
+      ifaces[ifname].forEach(function (iface) {
+        if ('IPv4' !== iface.family || iface.internal !== false) return;
+        ips.push(iface.address);
+      });
+    });
+    return ips;
+  }
+
+}
+
+const network = new Network();
+
+// ----------------- FormData -------------------
+
+class FormData {
+  constructor($form) {
+    var unindexed_array = $form.serializeArray();
+    var data = {};
+
+    $.map(unindexed_array, (n, i) => {
+        data[n['name']] = n['value'];
+    });
+
+    this.data = data;
+  }
+}
+
+// ------------------ PRELOADER ---------------------
+
+class UI_Preloader {
+  hide() {
+    $('div.preloader').hide();
+  }
+  show() {
+    $('div.preloader').show();
+  }
+}
+
+const  ui_Preloader = new UI_Preloader;
+
+
+
+
+// ---------------- DEVICE SETTINGS --------------------
+
+class UI_DeviceSettings {
+
+
+
+  getDeviceSettings() {
+    var deviceSettingsDefaults = {
+      wifiCredentials: [],
+      host: network.getIpAddresses()[0],
+      port: 4443,
+      secret: uid.makeid(24),
+      mode: 'motion',
+    };
+    var deviceSettings = storage.getItem('device-setup', deviceSettingsDefaults);
+    if (!deviceSettings || JSON.stringify(deviceSettings) === '{}') deviceSettings = deviceSettingsDefaults;
+    return deviceSettings;
+  }
+}
+
+const ui_DeviceSettings = new UI_DeviceSettings();
+
+// --------------- MOTION DETECTOR SETTINGS ---------
+
+class UI_MotionDeviceSettings {
+
+  getMotionDeviceSettingsHtml(cid, name) {
+    var device = devices.getDevice(cid);
+    if (device.info.mode !== 'motion') {
+      return `It's not a Motion Sensor but mode is: '${device.info.mode}'`;
+    }
+    var deviceSettings = ui_DeviceSettings.getDeviceSettings();
+    var ip4 = device.ws.ip4;
+    var secret = deviceSettings.secret;
+    var ts = timestamp.now();
+    var html = `
+      <form name="motion-device-settings" class="motion-device-settings">
+
+        <label>Device name:</label>
+        <input type="text" name="name" placeholder="Name" value="${name}">
+        <br>
+
+        <img class="motion-stream" src="http://${ip4}/stream?secret=${secret}&ts=${ts}">
+
+        <br>
+        <div class="middle">
+          <input type="button" value="Save" onclick="ui_MotionDeviceSettings.onSaveClick('${cid}')">
+          <input type="button" value="Cancel" onclick="ui_MotionDeviceSettings.onCancelClick('${cid}')">
+        </div>
+      </form>
+    `;
+    return html;
+  }
+
+  showMotionDeviceSettings(cid, name) {
+    var device = devices.getDevice(cid); 
+    ui_Preloader.show();   
+    device.ws.send('!STREAM STOP\0', () => {
+      var html = this.getMotionDeviceSettingsHtml(cid, name);
+      $('ul.motion-device-settings').html(html);
+      $('ul.motion-device-settings').show();
+      ui_Preloader.hide();
+    });
+  }
+
+  onSaveClick(cid) {
+    var data = (new FormData($('form[name="motion-device-settings"]'))).data;
+    ui_MotionDeviceList.setMotionDeviceName(cid, data.name);
+
+    // TODO Save here motion watcher settings too
+
+    this.onCancelClick(cid);
+  }
+
+  onCancelClick(cid) {
+    var device = devices.getDevice(cid);  
+    ui_Preloader.show();  
+    device.ws.send('!STREAM STOP\0', () => {
+      $('ul.motion-device-settings').hide();
+      ui_MotionDeviceList.show();
+      ui_Preloader.hide();
+    });
+  }
+
+}
+
+const ui_MotionDeviceSettings = new UI_MotionDeviceSettings();
+
+// --------------- MOTION DETECTORS ---------------
+
+class UI_MotionDeviceList {
+
+  constructor() {
+    this.storage = storage;
+    this.counter = new Counter('device');
+    this.deviceNames = this.storage.getItem('device-names', {});
+  }
+
+  getMotionDeviceName(cid) {
+    if (!this.deviceNames[cid]) {
+      this.setMotionDeviceName(cid, 'Device #' + this.counter.getNext());
+    }
+    return this.deviceNames[cid];
+  }
+
+  setMotionDeviceName(cid, name) {
+    this.deviceNames[cid] = name;
+    this.storage.setItem('device-names', this.deviceNames);
+  }
+
+  getMotionDeviceHtml(device) {
+    console.log('!', device);    
+    if (device.info && device.info.mode != 'motion') return '';
+    var isAliveClass = device.ws && device.ws.isAlive ? "connected" : "disconnected";
+    var cid = device.ws && device.ws.cid ? device.ws.cid : ""
+    var name = this.getMotionDeviceName(device.ws.cid);
+    var ip4 = device.ws.ip4;
+    var html = `
+      <li class="device ${isAliveClass}" data-cid="${cid}" onclick="ui_MotionDeviceList.onMotionDeviceClick('${cid}')">
+        <img class="light green" src="images/light-green.png">
+        <img class="light gray"src="images/light-gray.png">
+        <div class="infos">
+          <span class="name">${name}</span><br>
+          <span class="ip4">${ip4}</span><br>
+        </div>
+      </li>
+    `;
+    return html;
+  }
+
+  getMotionDeviceListHtml(deviceList) {
+    var html = '';
+    for (var key in deviceList.devices) {
+      var device = deviceList.devices[key];
+      if (device.info && device.info.mode == 'motion') {
+        html += this.getMotionDeviceHtml(device);
+      }
+    }
+    return html;
+  }
+
+
+  showMotionDevices(deviceList) {
+    var html = this.getMotionDeviceListHtml(deviceList);
+    $('ul.motion-device-list').html(html);
+  }
+
+  showMotionDevice(device) {
+    var html = this.getMotionDeviceHtml(device);
+    var cid = device.ws && device.ws.cid ? device.ws.cid : '';
+    if ($(`ul.motion-device-list > li[data-cid="${cid}"]`).length) {
+      $(`ul.motion-device-list > li[data-cid="${cid}"]`).replaceWith(html);
+    } else {
+      $(`ul.motion-device-list`).append(html);
+    }
+    ui_Preloader.hide();
+  }
+
+  show() {
+     $('ul.motion-device-list').show();
+  }
+
+  onMotionDeviceClick(cid) {
+    var name = this.getMotionDeviceName(cid);
+    $('ul.motion-device-list').hide();
+    ui_MotionDeviceSettings.showMotionDeviceSettings(cid, name);
+  }
+}
+
+const ui_MotionDeviceList = new UI_MotionDeviceList();
+
+
+// ----------------- HIDDEN UI ------------------------
+
 
 class Device {
 
@@ -44,9 +319,13 @@ class DeviceList {
     this.devices = this.storage.getItem(this.namespace, []);
   }
 
+  store() {
+    this.storage.setItem(this.namespace, this.devices);
+  }
+
   add(device) {
     this.devices[device.ws.cid] = device;
-    this.storage.setItem(this.namespace, this.devices);
+    this.store();
   }
 
   remove(cid) {
@@ -55,6 +334,10 @@ class DeviceList {
 
   update(cid, info) {
     this.devices[cid].info = info;
+  }
+
+  getDevice(cid) {
+    return this.devices[cid];
   }
 
 }
@@ -81,7 +364,10 @@ class DeviceServer {
             ws.terminate();
             return;
           }
-        } else this.app.onClientMessage(ws, JSON.parse(message));
+        } else {
+          console.log("message", message);
+          this.app.onClientMessage(ws, JSON.parse(message));
+        }
       });
 
     });
@@ -291,24 +577,26 @@ class System {
     };
   }
   makeid(length) {
-    var result           = '';
-    var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    var charactersLength = characters.length;
-    for ( var i = 0; i < length; i++ ) {
-      result += characters.charAt(Math.floor(Math.random() * charactersLength));
-    }
-    return result;
+    return uid.makeid(length);
+//     var result           = '';
+//     var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+//     var charactersLength = characters.length;
+//     for ( var i = 0; i < length; i++ ) {
+//       result += characters.charAt(Math.floor(Math.random() * charactersLength));
+//     }
+//     return result;
   }
   getIpAddresses() {
-    var ifaces = os.networkInterfaces();
-    var ips = [];
-    Object.keys(ifaces).forEach(function (ifname) {
-      ifaces[ifname].forEach(function (iface) {
-        if ('IPv4' !== iface.family || iface.internal !== false) return;
-        ips.push(iface.address);
-      });
-    });
-    return ips;
+    return network.getIpAddresses();
+//     var ifaces = os.networkInterfaces();
+//     var ips = [];
+//     Object.keys(ifaces).forEach(function (ifname) {
+//       ifaces[ifname].forEach(function (iface) {
+//         if ('IPv4' !== iface.family || iface.internal !== false) return;
+//         ips.push(iface.address);
+//       });
+//     });
+//     return ips;
   }
   
   getDeviceSetupDefaults() {
@@ -437,10 +725,11 @@ class UI {
   }
 
   getNow() {
-    if (!Date.now) {
-      Date.now = function() { return new Date().getTime(); }
-    }
-    return Date.now() / 1000 | 0;
+    return timestamp.now();
+//     if (!Date.now) {
+//       Date.now = function() { return new Date().getTime(); }
+//     }
+//     return Date.now() / 1000 | 0;
   }
 
   getDeviceInfoAsHtml(info) {
@@ -547,17 +836,19 @@ class UI {
 
   showDeviceList(deviceList) {
     $('#device-list ul').html(this.updateDevices(deviceList));
+    ui_MotionDeviceList.showMotionDevices(deviceList);
   }
 
   showDeviceInfo(deviceList, cid) {
     $('#device-' + cid + ' .device-info').html(
       this.getDeviceInfoAsHtml(deviceList.devices[cid].info)
     );
+    ui_MotionDeviceList.showMotionDevice(deviceList.devices[cid]);
   }
 }
 
 
-const storage = new Storage();
+// const storage = new Storage();
 const sys = new System();
 const ser = new SerialCom(sys);
 const ui = new UI(ser, sys, storage);
