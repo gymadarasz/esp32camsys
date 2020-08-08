@@ -486,9 +486,12 @@ class UI {
         <br>
 
         <input type="button" onclick="ui.updateDevice(app.devices.devices['${device.ws.cid}'])" value="update">
+        <input type="button" onclick="ui.resetDevice(app.devices.devices['${device.ws.cid}'])" value="reset">
         <br>
         
-        Motion: <input type="text" value="43,43,10,5,250" onclick="ui.updateMotion(app.devices.devices['${device.ws.cid}'], this.value)"> (x,y,size,raster,threshold)
+        Motion:<br> 
+        <input id="watcher" type="text" value="43,43,10,5,250"> (x,y,size,raster,threshold)<br>
+        <input type="button" value="set watcher" onclick="ui.updateMotion(app.devices.devices['${device.ws.cid}'], $('#watcher').val())">
         <br>
       </li>`;
   }
@@ -535,6 +538,10 @@ class UI {
     var msg = '!WATCH ' + valuestr + '\0';
     console.log(msg);
     device.ws.send(msg);
+  }
+
+  resetDevice(device) {
+    device.ws.send('!RESET\0');
   }
 
 

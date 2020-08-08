@@ -285,11 +285,12 @@ bool str_starts_with(const char *pre, const char *str)
     return lenstr < lenpre ? false : memcmp(pre, str, lenpre) == 0;
 }
 
-char* strncpy_offs(char* dest, size_t offs, const char* src, size_t max) {
+char* strncpy_offs(char* dest, int offs, const char* src, int srcoffs, size_t max) {
     int i=0;
     for (; i+offs<max; i++) {
-        if (!src[i]) break;
-        dest[i+offs] = src[i];
+        if (i+offs < 0) continue;
+        if (!src[i+srcoffs]) break;
+        dest[i+offs] = src[i+srcoffs];
     }
     dest[i+offs] = '\0';
     return dest;
@@ -386,8 +387,8 @@ typedef struct camsys_s camsys_t;
 
 
 #define WIFI_CREDS_SET(creds, i, ssid, pswd) { \
-    strncpy_offs(creds, i*WIFI_CRED_SIZE, ssid, WIFI_CREDS_SIZE); \
-    strncpy_offs(creds, i*WIFI_CRED_SIZE+WIFI_SSID_SIZE, pswd, WIFI_CREDS_SIZE); \
+    strncpy_offs(creds, i*WIFI_CRED_SIZE, ssid, 0, WIFI_CREDS_SIZE); \
+    strncpy_offs(creds, i*WIFI_CRED_SIZE+WIFI_SSID_SIZE, pswd, 0, WIFI_CREDS_SIZE); \
 }
 
 #define WIFI_CREDS_GET_SSID(creds, i) (&creds[i * (WIFI_CRED_SIZE)])
@@ -1527,65 +1528,54 @@ void wscli_app_on_websock_disconnected(void* arg) {
     app->ext->sys->streaming = false;
 }
 
-void wscli_app_on_websock_data(void* arg, esp_websocket_event_data_t* data) {
-    wifi_app_t* app = arg; // using argument as an app
-    ESP_LOGI(TAG, "----------- [WEBSOCKET DATA] -------------");
+//-------------------------------
 
-    ESP_LOGI(TAG, "WEBSOCKET_EVENT_DATA");
-    ESP_LOGI(TAG, "Received opcode=%d", data->op_code); // 1-text; 2-binary
-    ESP_LOGW(TAG, "Received=%.*s", data->data_len, (char *)data->data_ptr);
-    ESP_LOGW(TAG, "Total payload length=%d, data_len=%d, current payload offset=%d\r\n", data->payload_len, data->data_len, data->payload_offset);
+#define RESPONSE_SIZE 1000
+char response_buff[RESPONSE_SIZE];
+int camsys_resp_update(camsys_t* sys, watcher_t watcher, size_t diff_sum_max) {
+    response_buff[0] = '\0';
+    return snprintf(response_buff, RESPONSE_SIZE, 
+        "{\"func\":\"update\",\"mode\":\"%s\",\"streaming\":%s,\"camera\":{\"recording\":%s},\"watcher\":{\"x\":%d,\"y\":%d,\"size\":%d,\"raster\":%d,\"threshold\":%d,\"diff_sum_max\":%d}}", 
+        (sys->mode == CAMSYS_MODE_CAMERA ? "camera" : "motion"),
+        (sys->streaming ? "true" : "false"),
+        (sys->camera->file ? "true" : "false"),
+        watcher.x, watcher.y, watcher.size, watcher.raster, watcher.threshold, diff_sum_max
+    );
+}
 
-    size_t response_size = 1000;
-    char response_buff[response_size];
-    int outlen = 0; response_buff[0] = '\0';
-
-    if (!strcmp(data->data_ptr, "?UPDATE")) {
-
-        camsys_t* sys = app->ext->sys;
-
-        size_t diff_sum_max = watcher.diff_sum_max;
-        watcher.diff_sum_max = 0;
+esp_err_t camsys_handle_cmd(wifi_app_t* app, const char* cmd) {
+    int outlen = -1; 
+    
+    if (!strcmp(cmd, "?UPDATE")) {
         
-        outlen = snprintf(response_buff, response_size, 
-            "{\"func\":\"update\",\"mode\":\"%s\",\"streaming\":%s,\"camera\":{\"recording\":%s},\"watcher\":{\"x\":%d,\"y\":%d,\"size\":%d,\"raster\":%d,\"threshold\":%d,\"diff_sum_max\":%d}}", 
-            (sys->mode == CAMSYS_MODE_CAMERA ? "camera" : "motion"),
-            (sys->streaming ? "true" : "false"),
-            (sys->camera->file ? "true" : "false"),
-            watcher.x, watcher.y, watcher.size, watcher.raster, watcher.threshold, diff_sum_max
-        );
 
-    } else if (!strcmp(data->data_ptr, "!STREAM STOP")) {
+    } else if (!strcmp(cmd, "!STREAM STOP")) {
 
         app->ext->sys->streaming = false;
-        outlen = snprintf(response_buff, response_size, "{\"func\":\"msg\",\"msg\":\"stream stop\"}");
 
-    } else if (!strcmp(data->data_ptr, "!RECORD START")) {
+    } else if (!strcmp(cmd, "!RECORD START")) {
 
         esp_err_t err = camera_recording_start(app->ext->sys->camera);
-        if (err != ESP_OK) outlen = snprintf(response_buff, response_size, "{\"func\":\"err\",\"msg\":\"record start error: '%d'\"}", err);
-        else outlen = snprintf(response_buff, response_size, "{\"func\":\"msg\",\"msg\":\"record start\"}");
+        if (err != ESP_OK) outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"record start error: '%d'\"}", err);
 
-    } else if (!strcmp(data->data_ptr, "!RECORD STOP")) {
+    } else if (!strcmp(cmd, "!RECORD STOP")) {
 
         esp_err_t err = camera_recording_stop(app->ext->sys->camera);
-        if (err != ESP_OK) outlen = snprintf(response_buff, response_size, "{\"func\":\"err\",\"msg\":\"record stop error: '%d'\"}", err);
-        else outlen = snprintf(response_buff, response_size, "{\"func\":\"msg\",\"msg\":\"record stop\"}");
+        if (err != ESP_OK) outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"record stop error: '%d'\"}", err);
 
-    } else if (!strcmp(data->data_ptr, "!RECORD DELETE")) {
+    } else if (!strcmp(cmd, "!RECORD DELETE")) {
 
         esp_err_t err = camera_recording_delete(app->ext->sys->camera);
-        if (err != ESP_OK) outlen = snprintf(response_buff, response_size, "{\"func\":\"err\",\"msg\":\"record delete error: '%d'\"}", err);
-        else outlen = snprintf(response_buff, response_size, "{\"func\":\"msg\",\"msg\":\"record deleted\"}");
+        if (err != ESP_OK) outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"record delete error: '%d'\"}", err);
 
-    } else if (str_starts_with(data->data_ptr, "!WATCH ")) {
+    } else if (str_starts_with("!WATCH ", cmd)) {
         char buff[100];
-        strncpy_offs(buff, strlen("!WATCH "), data->data_ptr, 99);
+        strncpy_offs(buff, 0, cmd, strlen("!WATCH "), 99);
         ESP_LOGI(TAG, "watch data: '%s'", buff);
         
         int i = 0; // TODO make a function
         int alen = 5;
-        const char* tok = "/";
+        const char* tok = ",";
         char *p = strtok (buff, tok);
         char *array[alen];
 
@@ -1595,6 +1585,11 @@ void wscli_app_on_websock_data(void* arg, esp_websocket_event_data_t* data) {
             p = strtok (NULL, tok);
         }
 
+        ESP_LOGI(TAG, "watcher.x <= %s", array[0]);
+        ESP_LOGI(TAG, "watcher.y <= %s", array[1]);
+        ESP_LOGI(TAG, "watcher.size <= %s", array[2]);
+        ESP_LOGI(TAG, "watcher.raster <= %s", array[3]);
+        ESP_LOGI(TAG, "watcher.threshold <= %s", array[4]);
         watcher.x = atoi(array[0]); // TODO outsource into a sep function
         watcher.y = atoi(array[1]);
         watcher.size = atoi(array[2]);
@@ -1604,15 +1599,47 @@ void wscli_app_on_websock_data(void* arg, esp_websocket_event_data_t* data) {
         camsys_motion_websock_loop_first = true;
         camsys_motion_websock_loop_alert = false;
 
+    } else if (!strcmp(cmd, "!RESET")) {
+
+        esp_restart();
+
     } else {
 
-        outlen = snprintf(response_buff, response_size, "{\"func\":\"err\",\"msg\":\"Illegal request: '%s'\"}", (char*)data->data_ptr);
+        outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"Illegal request: '%s'\"}", (char*)cmd);
     
     }
-    
+
+    if (outlen == -1) {
+        camsys_t* sys = app->ext->sys;
+
+        size_t diff_sum_max = watcher.diff_sum_max;
+        watcher.diff_sum_max = 0;
+
+        outlen = camsys_resp_update(sys, watcher, diff_sum_max);
+    }
+
     if (-1 >= outlen || -1 >= esp_websocket_client_send_text(app->ext->client, response_buff, outlen, portMAX_DELAY)) {
         ESP_LOGE(TAG, "Message error, outlen:%d", outlen);
+        return ESP_FAIL;
     }
+
+    return ESP_OK;
+}
+
+//----------------------------
+
+void wscli_app_on_websock_data(void* arg, esp_websocket_event_data_t* data) {
+    wifi_app_t* app = arg; // using argument as an app
+    ESP_LOGI(TAG, "----------- [WEBSOCKET DATA] -------------");
+
+    ESP_LOGI(TAG, "WEBSOCKET_EVENT_DATA");
+    ESP_LOGI(TAG, "Received opcode=%d", data->op_code); // 1-text; 2-binary
+    ESP_LOGW(TAG, "Received=%.*s", data->data_len, (char *)data->data_ptr);
+    ESP_LOGW(TAG, "Total payload length=%d, data_len=%d, current payload offset=%d\r\n", data->payload_len, data->data_len, data->payload_offset);
+
+    ESP_ERROR_CHECK( camsys_handle_cmd(app, data->data_ptr) );
+
+    
 
     // const char* response_fmt = "ECHO: %s\n\0";
     // const size_t response_size = data->data_len + strlen(response_fmt) + 1;
