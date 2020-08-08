@@ -10,6 +10,7 @@ const Readline = require('@serialport/parser-readline')
 
 const os = require('os');
 
+
 // ----------------------- Storage ------------------------------
 
 class Storage {
@@ -41,12 +42,12 @@ class Counter {
   getNext() {
     var ret = this.next;
     this.next++;
-    storage.setItem(namespace + '-counter', this.next);
+    storage.setItem(this.namespace + '-counter', this.next);
     return ret;
   }
 }
 
-const counter = new Counter;
+const counter = new Counter('default');
 
 // ----------------- Timestamp ---------------------
 
@@ -126,37 +127,155 @@ const deviceSettingsDefaults = {
 
 const deviceSettings = storage.getItem('device-settings', deviceSettingsDefaults);
 
+
+// ------------------ Pages -----------------
+
+class Pages {
+  show(classname) {
+    $('.page').hide();
+    $('.page.'+classname).show();
+  }
+}
+
+const pages = new Pages();
+
+// ----------------  DeviceNameEditForm -----------------
+
+class DeviceNameEditForm {
+
+  setForm(cid, name) {
+    $('form[name="device-name-edit-form"] input[name="cid"]').val(cid);
+    $('form[name="device-name-edit-form"] input[name="name"]').val(name);
+  }
+
+  onOkClick() {
+    var cid = $('form[name="device-name-edit-form"] input[name="cid"]').val();
+    var name = $('form[name="device-name-edit-form"] input[name="name"]').val();
+    deviceList.setDeviceName(cid, name);
+    deviceList.showDeviceListHtml();
+    pages.show('device-list');
+  }
+
+  onCancelClick() {
+    pages.show('device-list');
+  }
+}
+
+const deviceNameEditForm = new DeviceNameEditForm();
+
+// ------------------ DeviceList ----------------------
+
+class DeviceList {
+  constructor() {
+    this.devices = [];
+    this.counter = new Counter('device');
+    this.loadDeviceNames();
+  }
+
+  loadDeviceNames() {
+    this.deviceNames = storage.getItem('device-names', {});
+  }
+  
+  getDeviceHtml(device) {
+    var mode = 'mode-unknown';
+    if (device.updates && device.updates.mode) mode = 'mode-' + device.updates.mode;
+    var html = `
+      <div class="device ${mode} ${(device.connected ? 'connected' : 'disconnected')}">
+        <div class="icon" onclick="deviceList.onDeviceClick('${device.ws.cid}')"></div>
+        <div class="label">
+          <span class="led"></span><span class="name" onclick="deviceList.onDeviceNameClick('${device.ws.cid}')">${device.name}</span>
+        </div>
+        <div class="title hidden">Device '${device.name}' from IP:${device.ws.ip4} has mode '${mode}' and now is ${(device.connected ? 'connected' : 'disconnected')}</div>
+      </div>`;
+    return html;
+  }
+
+  getDeviceListHtml() {
+    var html = '';
+    for (var cid in this.devices) {
+      var device = this.devices[cid];
+      html += this.getDeviceHtml(device);
+    }
+    return html;
+  }
+
+  showDeviceListHtml() {
+    var html = this.getDeviceListHtml();
+    $('div.device-list').html(html);
+  }
+
+  onDeviceConnected(ws) {
+    this.devices[ws.cid] = {
+      ws: ws,
+      connected: true,
+    }
+    this.showDeviceListHtml();
+    ws.send("?UPDATE");
+  }
+
+  setDeviceName(cid, name) {
+    this.deviceNames[cid] = name;
+    this.devices[cid].name = name;
+    storage.setItem('device-names', this.deviceNames);
+  }
+
+  getDeviceName(cid) {
+    if (!this.deviceNames[cid]) {
+      this.setDeviceName(cid, 'Device #' + this.counter.getNext());
+    }
+    return this.deviceNames[cid];
+  }
+
+  onDeviceUpdated(ws, message) {
+    this.devices[ws.cid].ws = ws;
+    this.devices[ws.cid].connected = true;
+    this.devices[ws.cid].updates = message;
+    this.devices[ws.cid].lastUpdate = timestamp.now();
+    this.devices[ws.cid].name = this.getDeviceName(ws.cid);
+    this.showDeviceListHtml();
+  }
+
+  onDeviceDisconnect(ws) {
+    this.devices[ws.cid].ws = ws;
+    this.devices[ws.cid].connected = false;
+    this.showDeviceListHtml();
+  }
+
+  onDeviceClick(cid) {
+    pages.show('device-view');
+  }
+
+  onDeviceNameClick(cid) {
+    var device = this.devices[cid];
+    deviceNameEditForm.setForm(cid, device.name);
+    pages.show('device-name-edit');
+  }
+}
+
+const deviceList = new DeviceList();
+
 // ----------------------------------------
 
 class App {
 
   onClientConnected(ws) {
-    console.error('needs to be implemented');
-    // this.devices.add(new Device(ws));
-    // this.ui.showDeviceList(this.devices);
-    // console.log('Device connected via websocket:', ws);
+    deviceList.onDeviceConnected(ws);
   }
+
   onClientMessage(ws, message) {
-    console.error('needs to be implemented');
-    // // TODO
-    // console.log('Message received:', message);
-    // var func = message.func;
-    // delete message.func;
-    // switch (func) {
-    //   case 'update':
-    //     this.devices.update(ws.cid, message);
-    //     this.ui.showDeviceInfo(this.devices, ws.cid);
-    //     ui_MotionDeviceSettings.onUpdateRecieved(ws.cid, message);
-    //     break;
-    //   default:
-    //     console.error('Unknown websocket message function: ' + func, 'message:', message);
-    // }
+    var func = message.func;
+    delete message.func;
+    switch (func) {
+      case 'update':
+        deviceList.onDeviceUpdated(ws, message);
+        break;
+      default:
+        console.error('Unknown websocket message function: ' + func, 'message:', message);
+    }
   }
+
   onClientDisconnect(ws) {
-    console.error('needs to be implemented');
-    // this.devices.remove(ws.cid);
-    // this.ui.showDeviceList(this.devices);
-    // console.log('Websocket disconnected:', ws);
+    deviceList.onDeviceDisconnect(ws);
   }
 
 }
@@ -205,7 +324,6 @@ wss.on('connection', (ws, req) => {
         return;
       }
     } else {
-      console.log("message", message);
       app.onClientMessage(ws, JSON.parse(message));
     }
   });
@@ -250,12 +368,10 @@ const preloader = new Preloader();
 
 class Menu {
   onDeviceSettingsClick() {
-    $('.page').hide();
-    $('.page.device-settings').show();
+    pages.show('device-settings');
   }
   onDeviceListClick() {
-    $('.page').hide();
-    $('.page.device-list').show();
+    pages.show('device-list');
   }
 }
 
@@ -418,5 +534,5 @@ const deviceSettingsForm = new DeviceSettingsForm();
 
 // ------------------------------------------------
 
-menu.onDeviceSettingsClick();
+menu.onDeviceListClick();
 preloader.hide();

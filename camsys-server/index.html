@@ -61,12 +61,35 @@
 
         <br>
         <div class="left">
+          <label>&nbsp;</label>
           <input type="button" value="Set up.." onclick="deviceSettingsForm.onSetupClick()">
         </div>
       </form>
     </div>
 
-    <div class="page device-list">[Device List]</div>
+    <div class="page device-list"></div>
+
+    <div class="page device-name-edit">
+      <form name="device-name-edit-form">
+        <h3 class="center">Edit device name</h3>
+        <br>
+
+        <input name="cid" type="hidden">
+
+        <label>Device name</label>
+        <input name="name" type="text" placeholder="Device name">
+        <br>
+
+        <br>
+        <div class="left">
+          <label>&nbsp;</label>
+          <input type="button" value="Ok" onclick="deviceNameEditForm.onOkClick()">
+          <input type="button" value="Cancel" onclick="deviceNameEditForm.onCancelClick()">
+        </div>
+      </form>
+    </div>
+
+    <div class="page device-view">[DEVICE VIEW]</div>
 
     
     <!-- You can also require other files to run in this process -->

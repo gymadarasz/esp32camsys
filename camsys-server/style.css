@@ -46,6 +46,7 @@ input, button, select, textarea {
   padding: 3px 6px;
   border: 1px solid #777;
   margin: 3px 6px;
+  border-radius: 4px
 }
 
 input, select, textarea {
@@ -72,6 +73,10 @@ ul {
 
 .clear {
   clear: both;
+}
+
+.hidden {
+  display: none;
 }
 
 .preloader {
@@ -105,4 +110,56 @@ form label {
   float: left;
   min-width: 220px;
   margin: 3px 6px;
+}
+
+.device {
+  position: relative;
+  display: block;
+  float: left;
+  margin: 10px;
+  padding: 10px;
+  border: 2px solid #232;
+  border-radius: 5px;
+}
+
+.device .icon {
+  display: block;
+  float: none;
+  width: 100px;
+  height: 100px;
+  background: #efe;
+  border: 1px solid #121;
+  border-radius: 5px;
+  box-shadow: 0px 3px 15px 5px #121;
+  background-repeat: no-repeat;
+  background-position: center;
+  margin: 10px auto;
+  cursor: pointer;
+}
+
+.device.mode-motion .icon {
+  background-image: url(./images/motion-sensor.png);
+}
+
+.device.mode-camera .icon {
+  background-image: url(./images/camera-recorder.png);
+}
+
+.device .led {
+  display: block;
+  float: left;
+  width: 16px;
+  height: 16px;
+  background: lightgreen;
+  border: 3px solid #555;
+  border-radius: 10px;
+  margin: 3px 10px 3px 3px;
+}
+
+.device.disconnected .led {
+  background: grey;
+}
+
+.device.disconnected .icon {
+  background: #676;
 }
