@@ -131,9 +131,32 @@ const deviceSettings = storage.getItem('device-settings', deviceSettingsDefaults
 // ------------------ Pages -----------------
 
 class Pages {
+  constructor() {
+    this.subscribes = {};
+  }
+  subscribe(classname, subscriber) {
+    if (!this.subscribes[classname]) this.subscribes[classname] = [];
+    this.subscribes[classname].push(subscriber);
+  }
   show(classname) {
+    if (this.subscribes[classname]) this.subscribes[classname].forEach((subscriber) => {
+      subscriber.onPageShow(classname);
+    });
+    $('.page').each((i, elem) => {
+      if ($(elem).is(':visible')) {
+        var classes = $(elem).attr('class').split(/\s+/);
+        for (var i = 0; i < classes.length; i++) {
+          if (this.subscribes[classes[i]]) this.subscribes[classes[i]].forEach((subscriber) => {
+            subscriber.onPageHide(classes[i]);
+          });
+        }
+      }
+    });
     $('.page').hide();
     $('.page.'+classname).show();
+  }
+  is(classname) {
+    return $('.page.'+classname).is(":visible");
   }
 }
 
@@ -163,6 +186,191 @@ class DeviceNameEditForm {
 
 const deviceNameEditForm = new DeviceNameEditForm();
 
+// ------------------- ErrorPage ----------------
+
+class ErrorPage {
+  show(message, returnPage) {
+    $('form[name="error-page-form"] .msg').html(message);
+    this.returnPage = returnPage;
+    pages.show('error-page');
+  }
+  onOkClick() {
+    pages.show(this.returnPage);
+  }
+}
+
+const errorPage = new ErrorPage();
+
+// ----------------- DeviceView -----------------
+
+class DeviceView {
+
+  constructor() {
+    pages.subscribe('device-view', this);
+  }
+
+  onPageShow(classname) {
+    // placeholder for pages subscription
+  }
+
+  onPageHide(classname) {
+    clearInterval(this.updateInterval);
+    preloader.show();
+    this.device.ws.send('!STREAM STOP\0', () => {
+      preloader.hide();
+    });
+  }
+
+  getWStyle(device) {
+    var wx = device.updates.watcher.x * 3; 
+    var wy = device.updates.watcher.y * 3; 
+    var ws = device.updates.watcher.size * 6;
+    wx = wx - (ws/2);
+    wy = wy - (ws/2);
+    var wstyle = `top:${wy}px; left:${wx}px; width:${ws}px; height:${ws}px;`;
+    return wstyle;
+  }
+
+  getDeviceMotionHtml(device) {
+    var cid = device.ws.cid;
+    var secret = deviceSettings.secret;
+    var ts = timestamp.now();
+    var uri = `http://${device.ws.ip4}/stream?secret=${secret}&ts=${ts}`;
+    var wstyle = this.getWStyle(device);
+    this.device = device;
+    var html = `
+      <form>
+        <h3 class="center">Motion sensor</h3>
+        <br>
+
+        <div class="device ${device.updates.mode}">
+          <div class="frame center" onclick="deviceView.onMotionStreamClick(this, event)">
+            <img class="stream" src="${uri}">
+            <div class="watcher" style="${wstyle}"></div>
+          </div>
+
+          size (<span class="watcher-size">${device.updates.watcher.size}</span>)
+          <div class="slider size"></div>
+          raster (<span class="watcher-raster">${device.updates.watcher.raster}</span>)
+          <div class="slider raster"></div>
+          threshold (<span class="watcher-threshold">${device.updates.watcher.threshold}</span>)
+          <div class="slider threshold"></div>
+          value (<span class="motion-value">?</span>)
+          <div class="slider value"></div>
+        </div>
+
+        <br class="clear">
+        <div class="center">
+          <input type="button" value="Save" onclick="deviceView.onSaveClick()">
+          <input type="button" value="Cancel" onclick="deviceView.onCancelClick()">
+        </div>
+      </form>
+    `;
+    return html;
+  }
+
+  getDeviceCameraHtml(device) {
+    console.error("needs to implement");
+  }
+
+  getDeviceHtml(device) {
+    if (!device.updates || !device.updates.mode) {
+      errorPage.show('Device mode is not set.', 'device-view');
+    } else {
+      switch(device.updates.mode) {
+        case 'motion':
+          return this.getDeviceMotionHtml(device);
+        case 'camera':
+          return this.getDeviceCameraHtml(device);
+        default:
+          errorPage.show('Unknown device mode: ' + device.updates.mode, 'device-view');
+      }
+    }
+  }
+
+  showDeviceHtml(device) {
+    preloader.show();
+    device.ws.send('!STREAM STOP\0', () => {
+      preloader.hide();
+      var html = this.getDeviceHtml(device);
+      $('.page.device-view').html(html);
+      $('.page.device-view .slider.size').slider({min: 1, max: 20, value: device.updates.watcher.size, change: function(event, ui) { deviceView.onSizeSliderChange(event, ui); }});
+      $('.page.device-view .slider.raster').slider({min: 1, max: 20, value: device.updates.watcher.raster, change: function(event, ui) { deviceView.onRasterSliderChange(event, ui); }});
+      $('.page.device-view .slider.threshold').slider({min: 1, max: 2000, value: device.updates.watcher.threshold, change: function(event, ui) { deviceView.onThresholdSliderChange(event, ui); }});
+      $('.page.device-view .slider.value').slider({min: 1, max: 2000, value: 0, disabled: true});
+      this.updateInterval = setInterval(() => {
+        device.ws.send('?UPDATE\0');
+      }, 2000);      
+    });
+  }
+
+  sendUpdatedWatcher(cb) {
+    var x = this.device.updates.watcher.x;
+    var y = this.device.updates.watcher.y;
+    var size = this.device.updates.watcher.size;
+    var raster = this.device.updates.watcher.raster;
+    var threshold = this.device.updates.watcher.threshold;
+    var msg = `!WATCH ${x},${y},${size},${raster},${threshold}\0`;
+    this.device.ws.send(msg, cb);
+  }
+
+  showUpdatedWatcher() {
+    $('.page.device-view .watcher').attr('style', this.getWStyle(this.device));
+    $('.page.device-view .watcher-size').html(this.device.updates.watcher.size);
+    $('.page.device-view .watcher-raster').html(this.device.updates.watcher.raster);
+    $('.page.device-view .watcher-threshold').html(this.device.updates.watcher.threshold);
+  }
+
+  onMotionStreamClick(that, event) {
+    var offset = $(that).offset();
+    var x = event.pageX - offset.left;
+    var y = event.pageY - offset.top;
+    x=parseInt(x/3);
+    y=parseInt(y/3);
+    this.device.updates.watcher.x = x;
+    this.device.updates.watcher.y = y;
+    this.showUpdatedWatcher();
+  }
+
+  onSizeSliderChange(elem, ui) {
+    this.device.updates.watcher.size = ui.value;
+    this.showUpdatedWatcher();
+  }
+
+  onRasterSliderChange(elem, ui) {
+    this.device.updates.watcher.raster = ui.value;
+    this.showUpdatedWatcher();
+  }
+
+  onThresholdSliderChange(elem, ui) {
+    this.device.updates.watcher.threshold = ui.value;
+    this.showUpdatedWatcher();
+  }
+
+  onSaveClick() {
+    preloader.show();
+    this.sendUpdatedWatcher(() => {
+      preloader.hide();
+      pages.show('device-list');
+    });
+  }
+
+  onCancelClick() {
+    pages.show('device-list');
+  }
+
+  onDeviceUpdated(ws, updates) {
+    if (pages.is('device-view') && this.device && this.device.ws.cid === ws.cid) {
+      console.log('UPDATE:', ws, updates);
+      $('.page.device-view .motion-value').html(updates.watcher.diff_sum_max);
+      $('.page.device-view .slider.value').slider( "option", "value", updates.watcher.diff_sum_max);
+    }
+  }
+
+}
+
+const deviceView = new DeviceView();
+
 // ------------------ DeviceList ----------------------
 
 class DeviceList {
@@ -191,11 +399,16 @@ class DeviceList {
   }
 
   getDeviceListHtml() {
-    var html = '';
+    var html = `
+      <form>
+        <h3 class="center">Device list</h3>
+        <br>
+    `;
     for (var cid in this.devices) {
       var device = this.devices[cid];
       html += this.getDeviceHtml(device);
     }
+    html += '</form>';
     return html;
   }
 
@@ -210,7 +423,7 @@ class DeviceList {
       connected: true,
     }
     this.showDeviceListHtml();
-    ws.send("?UPDATE");
+    ws.send("?UPDATE\0");
   }
 
   setDeviceName(cid, name) {
@@ -243,6 +456,7 @@ class DeviceList {
 
   onDeviceClick(cid) {
     pages.show('device-view');
+    deviceView.showDeviceHtml(this.devices[cid]);
   }
 
   onDeviceNameClick(cid) {
@@ -268,6 +482,7 @@ class App {
     switch (func) {
       case 'update':
         deviceList.onDeviceUpdated(ws, message);
+        deviceView.onDeviceUpdated(ws, message);
         break;
       default:
         console.error('Unknown websocket message function: ' + func, 'message:', message);
@@ -319,12 +534,17 @@ wss.on('connection', (ws, req) => {
       if (ws.cid = auth(message)) app.onClientConnected(ws);
       else {
         console.warn('Client auth error');
-        ws.send('Forbidden');
+        ws.send('Forbidden\0');
         ws.terminate();
         return;
       }
     } else {
-      app.onClientMessage(ws, JSON.parse(message));
+      try {
+        var parsed = JSON.parse(message)
+      } catch (e) {
+        console.error('JSON parse error: ', message);
+      }
+      app.onClientMessage(ws, parsed);
     }
   });
 

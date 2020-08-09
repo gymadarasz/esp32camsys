@@ -67,6 +67,8 @@ ul {
 }
 
 .center {
+  display: block;
+  float: none;
   width: 100%;
   text-align: center;
 }
@@ -77,6 +79,15 @@ ul {
 
 .hidden {
   display: none;
+}
+
+.frame {
+  position: relative;
+  display: block;
+  float: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
 .preloader {
@@ -101,7 +112,7 @@ ul {
 
 form {
   display: block;
-  float: left;
+  float: none;
   padding: 20px;
 }
 
@@ -163,3 +174,39 @@ form label {
 .device.disconnected .icon {
   background: #676;
 }
+
+/***************** device-view / motion *******************/
+
+.slider {
+  margin: 15px 0;
+}
+
+
+
+.device-view .device.motion {
+  display: block;
+  float: none;
+}
+
+.device-view .device.motion .frame {
+  cursor: crosshair;
+
+}
+.device-view .device.motion .stream {
+  width: 288px;
+  height: 288px;
+  border: 2px solid #666;
+  box-shadow: 0px 2px 10px #000;
+  user-drag: none; 
+  user-select: none;
+}
+
+.device-view .device.motion .watcher {
+  position: absolute;
+  display: block;
+  float: none;
+  border: 3px solid red;
+  background: transparent;
+}
+
+/*************************************************/

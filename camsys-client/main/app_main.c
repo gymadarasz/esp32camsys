@@ -927,6 +927,58 @@ typedef struct watcher_s watcher_t;
 watcher_t watcher = WATCHER_DEFAULT;
 
 
+bool camsys_motion_websock_loop_first = true;
+bool camsys_motion_websock_loop_alert = false;
+
+esp_err_t watch_save(nvs_handle_t handle, const char* data) {
+    esp_err_t err = nvs_set_str(handle, "watch", data);
+    if (err == ESP_OK) err = nvs_commit(handle);
+    return err;
+}
+
+esp_err_t watch_load(nvs_handle_t handle, char* data, size_t size) {
+    size_t required_size;
+    esp_err_t err = nvs_get_str(handle, "watch", NULL, &required_size);
+    if (err == ESP_OK) {
+        if (required_size >= size) return ESP_ERR_NVS_INVALID_LENGTH;
+        err = nvs_get_str(handle, "watch", data, &required_size);
+    }
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        strncpy(data, "44,44,10,5,251", size);
+        err = ESP_OK;
+    }
+    return err;
+}
+
+void watch_restore(char* buff) {
+    int i = 0; // TODO make a function
+    int alen = 5;
+    const char* tok = ",";
+    char *p = strtok (buff, tok);
+    char *array[alen];
+
+    while (p != NULL && i<alen)
+    {
+        array[i++] = p;
+        p = strtok (NULL, tok);
+    }
+
+    ESP_LOGI(TAG, "watcher.x <= %s", array[0]);
+    ESP_LOGI(TAG, "watcher.y <= %s", array[1]);
+    ESP_LOGI(TAG, "watcher.size <= %s", array[2]);
+    ESP_LOGI(TAG, "watcher.raster <= %s", array[3]);
+    ESP_LOGI(TAG, "watcher.threshold <= %s", array[4]);
+    watcher.x = atoi(array[0]); // TODO outsource into a sep function
+    watcher.y = atoi(array[1]);
+    watcher.size = atoi(array[2]);
+    watcher.raster = atoi(array[3]);
+    watcher.threshold = atoi(array[4]);
+    watcher.diff_sum_max = 0;
+    camsys_motion_websock_loop_first = true;
+    camsys_motion_websock_loop_alert = false;
+}
+
+
 void watcher_show_diff(size_t diff_sum, bool alert) {
     char spc[] = "]]]]]]]]]]]]]]]]]]]]]]]]]]]]][";
     char* s = spc; 
@@ -938,8 +990,6 @@ void watcher_show_diff(size_t diff_sum, bool alert) {
     ESP_LOGI(TAG, "%s", sbuff);
 }
 
-bool camsys_motion_websock_loop_first = true;
-bool camsys_motion_websock_loop_alert = false;
 void camsys_motion_websock_loop(wifi_app_t* app) {
     // TODO ...
     camera_fb_t* fb = motion_fb;
@@ -1308,6 +1358,13 @@ void wifi_app_main(wifi_app_t* app) {
             ESP_ERROR_CHECK( camsys_app_mode_load(app->nvs_handle, &mode) );
             app->ext->sys->mode = (bool)mode;
 
+            if (app->ext->sys->mode == CAMSYS_MODE_MOTION) {
+                const size_t size = 100;
+                char buff[size];// = "44,44,10,5,251";
+                ESP_ERROR_CHECK( watch_load(app->nvs_handle, buff, size) );
+                watch_restore(buff);
+            }
+
             ESP_LOGI(TAG, "mode load from settings: %d", (uint8_t)app->ext->sys->mode);
 
             // TODO may cam should be initialized here?
@@ -1569,35 +1626,13 @@ esp_err_t camsys_handle_cmd(wifi_app_t* app, const char* cmd) {
         if (err != ESP_OK) outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"record delete error: '%d'\"}", err);
 
     } else if (str_starts_with("!WATCH ", cmd)) {
-        char buff[100];
+        const size_t size = 100;
+        char buff[size];
         strncpy_offs(buff, 0, cmd, strlen("!WATCH "), 99);
         ESP_LOGI(TAG, "watch data: '%s'", buff);
-        
-        int i = 0; // TODO make a function
-        int alen = 5;
-        const char* tok = ",";
-        char *p = strtok (buff, tok);
-        char *array[alen];
 
-        while (p != NULL && i<alen)
-        {
-            array[i++] = p;
-            p = strtok (NULL, tok);
-        }
-
-        ESP_LOGI(TAG, "watcher.x <= %s", array[0]);
-        ESP_LOGI(TAG, "watcher.y <= %s", array[1]);
-        ESP_LOGI(TAG, "watcher.size <= %s", array[2]);
-        ESP_LOGI(TAG, "watcher.raster <= %s", array[3]);
-        ESP_LOGI(TAG, "watcher.threshold <= %s", array[4]);
-        watcher.x = atoi(array[0]); // TODO outsource into a sep function
-        watcher.y = atoi(array[1]);
-        watcher.size = atoi(array[2]);
-        watcher.raster = atoi(array[3]);
-        watcher.threshold = atoi(array[4]);
-        watcher.diff_sum_max = 0;
-        camsys_motion_websock_loop_first = true;
-        camsys_motion_websock_loop_alert = false;
+        ESP_ERROR_CHECK( watch_save(app->nvs_handle, buff) );
+        watch_restore(buff);
 
     } else if (!strcmp(cmd, "!RESET")) {
 

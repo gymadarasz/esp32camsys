@@ -91,6 +91,19 @@
 
     <div class="page device-view">[DEVICE VIEW]</div>
 
+    <div class="page error-page">
+      <form name="error-page-form">
+        <h3 class="center">Error</h3>
+        <br>
+
+        <span class="msg center"></span>
+
+        <br>
+        <div class="center">
+          <input type="button" value="Ok" onclick="errorPage.onOkClick()">
+        </div>
+      </form>
+    </div>
     
     <!-- You can also require other files to run in this process -->
     <script>window.$ = window.jQuery = require('jquery');</script>
