@@ -29,15 +29,49 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/************** SCROLLBAR *************************/
+
+/* width */
+::-webkit-scrollbar {
+  width: 30px;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+  background: #eee;
+  box-shadow: inset 0 0 5px grey;
+  border-radius: 4px;
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+  background: #8a8;
+  border-radius: 4px;
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: #565;
+}
+
+/***************************************************/
+
 * {
     font-family: 'Inconsolata', monospace;
     font-size: 24px;
     margin: 0;
     padding: 0;
     border: 0;
-    background: #343;
     color: #efe;
     text-shadow: 0px 0px 5px #000;
+}
+
+body {
+  background: #343;
+}
+
+body.alert {
+  background: #633;
 }
 
 input, button, select, textarea {
@@ -59,11 +93,20 @@ button, input[type="button"] {
   cursor: pointer;
 }
 
+
+button, input[type="button"].red {
+  background: #900;
+  color: #efe;
+}
+button, input[type="button"].green {
+  background: #afa;
+  color: #252;
+}
+
 ul {
   list-style-type: none;
   display: block;
   float: left;
-  background: blue;
 }
 
 .center {
@@ -123,6 +166,7 @@ form label {
   margin: 3px 6px;
 }
 
+
 .device {
   position: relative;
   display: block;
@@ -152,11 +196,16 @@ form label {
   background-image: url(./images/motion-sensor.png);
 }
 
+.device.mode-motion.alert,
+.device.motion.alert {
+  background: red;
+}
+
 .device.mode-camera .icon {
   background-image: url(./images/camera-recorder.png);
 }
 
-.device .led {
+.led {
   display: block;
   float: left;
   width: 16px;
@@ -166,16 +215,23 @@ form label {
   border-radius: 10px;
   margin: 3px 10px 3px 3px;
 }
+.led.red {
+  background: red;
+}
 
-.device.disconnected .led {
+div.page.device-view .led {
+  float: right;
+}
+
+.disconnected .led {
   background: grey;
 }
 
-.device.disconnected .icon {
+.disconnected .icon {
   background: #676;
 }
 
-/***************** device-view / motion *******************/
+/***************** device-view / motion / camera *******************/
 
 .slider {
   margin: 15px 0;
@@ -183,25 +239,44 @@ form label {
 
 
 
-.device-view .device.motion {
+.device {
   display: block;
   float: none;
 }
 
-.device-view .device.motion .frame {
+.device .frame {
   cursor: crosshair;
+  background-image: url("./images/preloader.gif");
+  background-repeat: no-repeat;
+  background-position: center;
 
 }
-.device-view .device.motion .stream {
+.device.motion .stream {
   width: 288px;
   height: 288px;
   border: 2px solid #666;
-  box-shadow: 0px 2px 10px #000;
+  background: transparent;
   user-drag: none; 
   user-select: none;
 }
 
-.device-view .device.motion .watcher {
+.device.motion .frame {
+  min-width: 288px;
+  min-height: 288px;
+  float: left;
+}
+.device.camera .frame {
+  min-width: 320px;
+  min-height: 240px;
+}
+.device.camera .stream {
+  border: 2px solid #666;
+  background: transparent;
+  user-drag: none; 
+  user-select: none;
+}
+
+.device.motion .watcher {
   position: absolute;
   display: block;
   float: none;
@@ -210,3 +285,17 @@ form label {
 }
 
 /*************************************************/
+
+.device-list .device {
+  float: left;
+  min-width: 40%
+}
+.device-list .device .label {
+  float: none;
+}
+.device-list .device .label .led {
+  float: right;
+}
+.device-list .device .label .name {
+  float: left;
+}

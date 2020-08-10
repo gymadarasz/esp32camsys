@@ -296,34 +296,88 @@ char* strncpy_offs(char* dest, int offs, const char* src, int srcoffs, size_t ma
     return dest;
 }
 
+// ---------------------------------------------------------------
+// FILE EXTRAS
+// ---------------------------------------------------------------
+
+long int get_file_size(const char* filename) 
+{ 
+    // opening the file in read mode 
+    FILE* fp = fopen(filename, "r"); 
+  
+    // checking if the file exist or not 
+    if (fp == NULL) { 
+        // file not found error
+        return -1; 
+    } 
+  
+    if (fseek(fp, 0L, SEEK_END)) {
+        // fseek error
+        return -2;
+    }
+  
+    // calculating the size of the file 
+    long int res = ftell(fp); 
+    if (res == -1L) {
+        // ftell error
+        return -3;
+    }
+  
+    // closing the file 
+    if (fclose(fp)) {
+        // fclose error
+        return -4;
+    }
+  
+    return res; 
+} 
+
 // ------------------------------------------------------
 // CAMERA
 // ------------------------------------------------------
 
 struct camsys_camera_s {
     FILE* file;
+    FILE* idxf;
 };
 
 typedef struct camsys_camera_s camsys_camera_t;
 
+bool camsys_fb_hold = false;
+
 void camera_recording_init(camsys_camera_t* camera) {
     camera->file = NULL;
+    camera->idxf = NULL;
 }
 
 esp_err_t camera_recording_stop(camsys_camera_t* camera) {
-    if (fclose(camera->file)) return ESP_FAIL;
+    esp_err_t ret = ESP_OK;
+    ESP_LOGI(TAG, "STP REC..");
+    while(camsys_fb_hold) ESP_LOGI(TAG, "FB HOLD..");
+    ESP_LOGI(TAG, "FCLOSE..");
+    if (fclose(camera->file) || fclose(camera->idxf)) ret = ESP_FAIL;
     camera->file = NULL;
-    return ESP_OK;
+    camera->idxf = NULL;
+    ESP_LOGI(TAG, "REC STP.");
+    return ret;
 }
 
 
 esp_err_t camera_recording_open(camsys_camera_t* camera, const char* mode) {
     if (camera->file && ESP_OK != camera_recording_stop(camera)) return ESP_FAIL;
     
-    camera->file = fopen(SDCARD_MOUNT_POINT"/record", mode);
+    camera->file = fopen(SDCARD_MOUNT_POINT"/record.vid", mode);
     if (!camera->file) {
-        ESP_LOGE(TAG, "file open error: %d", errno);
+        ESP_LOGE(TAG, "fopen err: %d", errno);
         return ESP_FAIL;
+    }
+
+    if (mode[0] != 'r') {
+        camera->idxf = fopen(SDCARD_MOUNT_POINT"/record.idx", mode);
+        if (!camera->idxf) {
+            ESP_LOGE(TAG, "idx fopen err: %d", errno);
+            return ESP_FAIL;
+        }
     }
     return ESP_OK;  
 }
@@ -582,7 +636,7 @@ void camsys_camera_init(bool mode, bool power_up) {
 // --- nvs ---
 
 esp_err_t camsys_app_mode_save(nvs_handle_t handle, uint8_t mode) {
-    ESP_LOGE(TAG, "mode set to %d", mode);
+    ESP_LOGE(TAG, "mode %d", mode);
     esp_err_t err = nvs_set_u8(handle, "mode", mode);
     if (err == ESP_OK) err = nvs_commit(handle);
     return err;
@@ -606,23 +660,37 @@ static const char* CAMSYS_CAMERA_STREAM_PART = "Content-Type: image/jpeg\r\nCont
 
 wifi_app_t* _app = NULL;
 
-bool camsys_fb_hold = false;
+#define RECORD_INDEX_CONTER_MAX 100
+int record_index_cnt = 0;
 
 camera_fb_t * camsys_fb_get(wifi_app_t* app) {
     while(camsys_fb_hold);
     camsys_fb_hold = true;
-    camera_fb_t * fb = esp_camera_fb_get();
+    camera_fb_t * fb = esp_camera_fb_get();    
     if (fb && app->ext->sys->mode == CAMSYS_MODE_CAMERA && app->ext->sys->camera->file) {
+
+        record_index_cnt--;
+        if (record_index_cnt<=0) {
+            record_index_cnt = RECORD_INDEX_CONTER_MAX;
+            long int pos = ftell(app->ext->sys->camera->file);
+            if (pos == 1L) ESP_LOGW(TAG, "Index retr fail");
+            else {
+                ESP_LOGI(TAG, "idxf(%d)", !!app->ext->sys->camera->idxf);
+                if (1 != fwrite(&pos, sizeof(long int), 1, app->ext->sys->camera->idxf)) 
+                    ESP_LOGW(TAG, "Index write fail: err: %d", ferror(app->ext->sys->camera->idxf));
+            }
+        }
+
         ESP_LOGI(TAG, "write frame structure..");
         size_t written = fwrite(fb, sizeof(camera_fb_t), 1, app->ext->sys->camera->file);
         if (written != 1) {
-            ESP_LOGE(TAG, "write error: written: %d != 1, error: %d", written, ferror(app->ext->sys->camera->file));
+            ESP_LOGW(TAG, "write err: %d != 1, err: %d", written, ferror(app->ext->sys->camera->file));
         }
         else {
             ESP_LOGI(TAG, "write frame buffer..");
             written = fwrite(fb->buf, sizeof(uint8_t), fb->len, app->ext->sys->camera->file);
             if (written != fb->len) {
-                ESP_LOGE(TAG, "write error: written: %d != fb->len: %d, error: %d", written, fb->len, ferror(app->ext->sys->camera->file));
+                ESP_LOGW(TAG, "write err: %d != fb->len: %d, err: %d", written, fb->len, ferror(app->ext->sys->camera->file));
             }
         }
     }
@@ -637,7 +705,6 @@ esp_err_t camsys_fb_return(camera_fb_t * fb) {
 }
 
 bool camsys_check_secret(wifi_app_t* app, httpd_req_t* req) {
-    //return true; // TODO: remove this line to validate secret parameter
     bool secret_ok = false;
     if (!app->ext->secret || app->ext->secret[0] == '\0') return secret_ok;
 
@@ -647,11 +714,11 @@ bool camsys_check_secret(wifi_app_t* app, httpd_req_t* req) {
     if (buf_len > 1) {
         char* buf = malloc(buf_len);
         if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK) {
-            ESP_LOGI("camsys", "Found URL query"/*, buf*/);
+            //ESP_LOGI(TAG, "Found URL query"/*, buf*/);
             char param[40];
             /* Get value of expected key from query string */
             if (httpd_query_key_value(buf, "secret", param, sizeof(param)) == ESP_OK) {
-                ESP_LOGI("camsys", "Found URL query parameter => secret"/*, param*/);
+                ESP_LOGI(TAG, "Found URL secret"/*, param*/);
                 if (!strcmp(param, app->ext->secret)) secret_ok = true;
             }
         }
@@ -663,28 +730,28 @@ bool camsys_check_secret(wifi_app_t* app, httpd_req_t* req) {
 camera_fb_t * replay_fb_get(wifi_app_t* app) {
     camera_fb_t* fb = malloc(sizeof(camera_fb_t));
     if (!fb) {
-        ESP_LOGE(TAG, "mem alloc for fb error");
+        ESP_LOGE(TAG, "mem alloc fb err");
         return NULL;
     }
     FILE* f = app->ext->sys->camera->file;
     if (!f) {
-        ESP_LOGE(TAG, "record file is not open");
+        ESP_LOGE(TAG, "rec file is not open");
         free(fb);
         return NULL;
     }
     if (1 != fread(fb, sizeof(camera_fb_t), 1, f)) {
-        ESP_LOGE(TAG, "record fb read error");
+        ESP_LOGE(TAG, "rec fb read err");
         free(fb);
         return NULL;
     }
     fb->buf = malloc(fb->len);
     if (!fb) {
-        ESP_LOGE(TAG, "mem alloc for fb->buf error");
+        ESP_LOGE(TAG, "mem alloc fb->buf err");
         free(fb);
         return NULL;
     }
     if (fb->len != fread(fb->buf, sizeof(uint8_t), fb->len, f)) {
-        ESP_LOGE(TAG, "record fb->buf read error");
+        ESP_LOGE(TAG, "rec fb->buf read err");
         free(fb->buf);
         free(fb);
         return NULL;
@@ -708,9 +775,7 @@ esp_err_t camsys_camera_httpd_stream_replay_handler(wifi_app_t* app, httpd_req_t
 
     res = httpd_resp_set_type(req, CAMSYS_CAMERA_STREAM_CONTENT_TYPE);
     if(res != ESP_OK) return res;
-    
-    //ESP_ERROR_CHECK_WITHOUT_ABORT( camera_recording_start(app->ext->sys->camera) ); // TODO: remove this to switch off recording autostart
-
+  
     app->ext->sys->streaming = true;
 
     if (replay) ESP_ERROR_CHECK( camera_recording_open(app->ext->sys->camera, "rb") );
@@ -720,7 +785,7 @@ esp_err_t camsys_camera_httpd_stream_replay_handler(wifi_app_t* app, httpd_req_t
         fb = replay ? replay_fb_get(app) : camsys_fb_get(app);
         
         if (!fb) {
-            ESP_LOGE(TAG, "Camera capture failed");
+            ESP_LOGE(TAG, "Cam capt fail");
             res = ESP_FAIL;
             break;
         }
@@ -751,9 +816,7 @@ esp_err_t camsys_camera_httpd_stream_replay_handler(wifi_app_t* app, httpd_req_t
     }
 
     if (replay) ESP_ERROR_CHECK( camera_recording_stop(app->ext->sys->camera) );
-    
-    //ESP_ERROR_CHECK_WITHOUT_ABORT( camera_recording_stop(app->ext->sys->camera) );// TODO: remove this when recording autostart is switched off 
-    
+
     app->ext->sys->streaming = false;
 
     return res;
@@ -786,14 +849,14 @@ esp_err_t camsys_motion_httpd_image_handler(wifi_app_t* app, httpd_req_t* req) {
             fb = esp_camera_fb_get();
         }
         if (!fb) {
-            ESP_LOGE("camsys", "Camera capture failed");
+            ESP_LOGE(TAG, "Cam cpt fail");
             res = ESP_FAIL;
             break;
         }
         
         bool bmp_converted = frame2bmp(fb, &_bmp_buf, &_bmp_buf_len);
         if(!bmp_converted){
-            ESP_LOGE("camsys", "BMP compression failed");
+            ESP_LOGE(TAG, "BMP fail");
             esp_camera_fb_return(fb);
             res = ESP_FAIL;
         }
@@ -900,8 +963,19 @@ esp_err_t websock_sendf(esp_websocket_client_handle_t client, const char* fmt, .
 // ----------------- camera/motion websocket loops ---------------------
 
 void camsys_camera_websock_loop(wifi_app_t* app) {
-    // TODO ...
-    
+    // record video when recording but not streaming and not playback
+    if (!app->ext->sys->streaming && app->ext->sys->camera->file && app->ext->sys->camera->idxf) {
+        ESP_LOGI(TAG, "rec.. (no strm)");
+
+        camera_fb_t * fb = camsys_fb_get(app);
+        
+        if (!fb) {
+            ESP_LOGE(TAG, "Cam capture fail");
+        } else {
+            if (ESP_OK != camsys_fb_return(fb)) ESP_LOGE(TAG, "Cam fb ret fail");
+        }
+        
+    }
 }
 
 // -----------------------------------
@@ -951,7 +1025,7 @@ esp_err_t watch_load(nvs_handle_t handle, char* data, size_t size) {
 }
 
 void watch_restore(char* buff) {
-    int i = 0; // TODO make a function
+    int i = 0;
     int alen = 5;
     const char* tok = ",";
     char *p = strtok (buff, tok);
@@ -963,12 +1037,12 @@ void watch_restore(char* buff) {
         p = strtok (NULL, tok);
     }
 
-    ESP_LOGI(TAG, "watcher.x <= %s", array[0]);
-    ESP_LOGI(TAG, "watcher.y <= %s", array[1]);
-    ESP_LOGI(TAG, "watcher.size <= %s", array[2]);
-    ESP_LOGI(TAG, "watcher.raster <= %s", array[3]);
-    ESP_LOGI(TAG, "watcher.threshold <= %s", array[4]);
-    watcher.x = atoi(array[0]); // TODO outsource into a sep function
+    // ESP_LOGI(TAG, "watcher.x <= %s", array[0]);
+    // ESP_LOGI(TAG, "watcher.y <= %s", array[1]);
+    // ESP_LOGI(TAG, "watcher.size <= %s", array[2]);
+    // ESP_LOGI(TAG, "watcher.raster <= %s", array[3]);
+    // ESP_LOGI(TAG, "watcher.threshold <= %s", array[4]);
+    watcher.x = atoi(array[0]);
     watcher.y = atoi(array[1]);
     watcher.size = atoi(array[2]);
     watcher.raster = atoi(array[3]);
@@ -979,24 +1053,24 @@ void watch_restore(char* buff) {
 }
 
 
-void watcher_show_diff(size_t diff_sum, bool alert) {
-    char spc[] = "]]]]]]]]]]]]]]]]]]]]]]]]]]]]][";
-    char* s = spc; 
-    for (int i=0; i<29; i++) {
-        if (i*10>diff_sum) s[i] = ' ';
-    }
-    char sbuff[100];
-    snprintf(sbuff, 100, "%s (%u) %s", s, diff_sum, alert ? "ALERT!!!" : "");
-    ESP_LOGI(TAG, "%s", sbuff);
-}
+// void watcher_show_diff(size_t diff_sum, bool alert) {
+//     char spc[] = "]]]]]]]]]]]]]]]]]]]]]]]]]]]]][";
+//     char* s = spc; 
+//     for (int i=0; i<29; i++) {
+//         if (i*10>diff_sum) s[i] = ' ';
+//     }
+//     char sbuff[100];
+//     snprintf(sbuff, 100, "%s (%u) %s", s, diff_sum, alert ? "ALERT!!!" : "");
+//     ESP_LOGI(TAG, "%s", sbuff);
+// }
 
 void camsys_motion_websock_loop(wifi_app_t* app) {
-    // TODO ...
+    
     camera_fb_t* fb = motion_fb;
 
     fb = camsys_fb_get(app);            
     if (!fb) {
-        ESP_LOGE(TAG, "Motion Camera capture failed");
+        ESP_LOGE(TAG, "Motion Cam capture fail");
         ESP_ERROR_CHECK( camsys_fb_return(fb) );
         return;
     }
@@ -1027,7 +1101,9 @@ void camsys_motion_websock_loop(wifi_app_t* app) {
         camsys_motion_websock_loop_alert = !camsys_motion_websock_loop_first && diff_sum >= watcher.threshold;
     camsys_motion_websock_loop_first = false;
 
-    watcher_show_diff(diff_sum, camsys_motion_websock_loop_alert);
+    // use this for debugging:
+    // watcher_show_diff(diff_sum, camsys_motion_websock_loop_alert);
+    
     if (camsys_motion_websock_loop_alert) {
         // PRINT("******************************************************");
         // PRINT("*********************** [ALERT] **********************");
@@ -1070,7 +1146,7 @@ uint16_t wifi_scan(wifi_scan_list_t ap_info) {
     ESP_ERROR_CHECK(esp_wifi_scan_start(NULL, true));
     ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&number, ap_info));
     ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
-    ESP_LOGI(TAG, "Total APs scanned = %u", ap_count);
+    ESP_LOGI(TAG, "APs scanned = %u", ap_count);
 
     ESP_ERROR_CHECK( esp_wifi_stop() );
     return ap_count;
@@ -1100,12 +1176,12 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
         if (wifi_retry_num < WIFI_CONNECT_MAXIMUM_RETRY) {
             esp_wifi_connect();
             wifi_retry_num++;
-            ESP_LOGI(TAG, "retry to connect to the AP (%d)", wifi_retry_num);
+            ESP_LOGI(TAG, "RETRY AP (%d)", wifi_retry_num);
         } else {
             wifi_retry_num = 0;
             xEventGroupSetBits(wifi_event_group, WIFI_FAIL_BIT);
         }
-        ESP_LOGE(TAG,"connect to the AP fail");
+        ESP_LOGE(TAG,"CONN AP fail");
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         // ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
         // ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
@@ -1195,7 +1271,7 @@ esp_err_t wifi_connect(const char* ssid, const char* pswd) {
         //          ssid, pswd);
         ret = ESP_ERR_WIFI_NOT_CONNECT;
     } else {
-        ESP_LOGE(TAG, "UNEXPECTED EVENT");
+        ESP_LOGE(TAG, "UNEXP EVN");
         ret = ESP_FAIL;
         esp_restart();
     }
@@ -1242,18 +1318,13 @@ void wifi_connection_keep_alive(wifi_app_t* app) {
 
 void wifi_app_run(wifi_app_t* app) {
 
-    // TODO may cam should be initialized here?
-
     wifi_init();
 
     camsys_httpd_server_init(app);
 
-    // TODO may cam should be initialized here?
     sdcard_init();
 
     wifi_connection_establish(app);
-
-    // TODO may cam should be initialized here?
 
     while(!app->exited) {
         wifi_connection_keep_alive(app);
@@ -1333,20 +1404,12 @@ void wifi_app_settings(wifi_app_t* app) {
 
 void wifi_app_main(wifi_app_t* app) {
 
-
-    // TODO may cam should be initialized here? 1
     flash_init();
-
-    // TODO may cam should be initialized here?
 
     // NVS Open
     ESP_ERROR_CHECK( nvs_open(app->namespace, NVS_READWRITE, &app->nvs_handle) );
-    
-    // TODO may cam should be initialized here?
 
     app->mode = wifi_app_get_mode();
-
-    // TODO may cam should be initialized here?
 
     uint8_t mode = CAMSYS_MODE_MOTION;
     switch (app->mode) {
@@ -1365,20 +1428,16 @@ void wifi_app_main(wifi_app_t* app) {
                 watch_restore(buff);
             }
 
-            ESP_LOGI(TAG, "mode load from settings: %d", (uint8_t)app->ext->sys->mode);
+            ESP_LOGI(TAG, "MODE: %d", (uint8_t)app->ext->sys->mode);
 
-            // TODO may cam should be initialized here?
             camsys_camera_init(app->ext->sys->mode, true);
-            ESP_LOGI(TAG, "camera initialized...");
 
             ESP_ERROR_CHECK( wifi_creds_load(app) );
-
-            // TODO may cam should be initialized here?
 
             wifi_app_run(app);
             break;
         default:
-            ESP_LOGE(TAG, "Incorrect Wifi App Mode: %d", app->mode);
+            ESP_LOGE(TAG, "MODE ERR: %d", app->mode);
             app->exited = true;
             break;
     }
@@ -1500,7 +1559,7 @@ static void wscli_app_websocket_event_handler(void *handler_args, esp_event_base
         if (app->ext->on_websock_error) (app->ext->on_websock_error)(app, data);
         break;
     default:
-        ESP_LOGE(TAG, "Websocket event unhandled: %d", event_id);
+        ESP_LOGE(TAG, "WS EVN: %d", event_id);
         app->exited = true;
         break;
     }
@@ -1522,7 +1581,7 @@ void wscli_app_websocket_start(wifi_app_t* app) {
     app->ext->websocket_cfg.uri = wsuri_buff;
     app->ext->websocket_cfg.pingpong_timeout_sec = 3;
     
-    ESP_LOGI(TAG, "Connecting to %s...", app->ext->websocket_cfg.uri);
+    ESP_LOGI(TAG, "CONN:%s..", app->ext->websocket_cfg.uri);
 
     app->ext->client = esp_websocket_client_init(&app->ext->websocket_cfg);
     if (!app->ext->client) app->ext->on_websock_error(app, NULL);
@@ -1535,7 +1594,7 @@ void wscli_app_websocket_start(wifi_app_t* app) {
 void wscli_app_websocket_stop(wifi_app_t* app) {
     xSemaphoreTake(shutdown_sema, portMAX_DELAY);
     ESP_ERROR_CHECK_WITHOUT_ABORT( esp_websocket_client_stop(app->ext->client) );
-    ESP_LOGI(TAG, "Websocket Stopped");
+    ESP_LOGI(TAG, "WS STP");
     ESP_ERROR_CHECK_WITHOUT_ABORT( esp_websocket_client_destroy(app->ext->client) );
 }
 
@@ -1602,9 +1661,68 @@ int camsys_resp_update(camsys_t* sys, watcher_t watcher, size_t diff_sum_max) {
 
 esp_err_t camsys_handle_cmd(wifi_app_t* app, const char* cmd) {
     int outlen = -1; 
+
+    const size_t size = 100;
+    char buff[size];
     
     if (!strcmp(cmd, "?UPDATE")) {
         
+
+    } else if (!strcmp(cmd, "?INDEX")) {
+
+        if (!app->ext->sys->camera->idxf) {
+            long int sz = get_file_size(SDCARD_MOUNT_POINT"/record.idx");
+            if (sz < 0) outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"Index retrieve error: %ld\"}", sz);
+            else {
+                sz /= sizeof(long int);
+                outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"index\",\"size\":%ld}", sz);
+            }
+        } else outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"Recording in progress, please stop first.. (1)\"}");
+    
+    } else if (str_starts_with("!INDEX ", cmd)) {
+
+        if (!app->ext->sys->camera->idxf) {
+            //if (!app->ext->sys->streaming) {
+
+                strncpy_offs(buff, 0, cmd, strlen("!INDEX "), 99);
+                ESP_LOGI(TAG, "index param: '%s'", buff);
+                long int n = atoi(buff);
+
+                FILE* idxf = fopen(SDCARD_MOUNT_POINT"/record.idx", "rb");
+                if (!idxf) {
+                    ESP_LOGW(TAG, "index file open error (2): %d", errno);
+                    outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"index file open error (2): %d\"}", errno);
+                } else {
+                    
+                    if (fseek(idxf, n * sizeof(long int), SEEK_SET)) {                
+                        ESP_LOGW(TAG, "index file seek error");
+                        outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"index file seek error\"}");
+                    } else {
+
+                        long int fpos; 
+                        if (1 != fread(&fpos, sizeof(long int), 1, idxf)) {
+                            ESP_LOGW(TAG, "index file read error");
+                            outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"index file reed error\"}");
+                        } else {
+
+                            while(camsys_fb_hold) ESP_LOGI(TAG, "FB HOLD... (2)");
+                            if (app->ext->sys->camera->file) {
+                                if (fseek(app->ext->sys->camera->file, fpos, SEEK_SET)) {                
+                                    ESP_LOGW(TAG, "record video file seek error");
+                                    outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"record video file seek error\"}");
+                                } else {
+
+                                    if (fclose(idxf)) ESP_LOGW(TAG, "index file close error");
+                                }
+                            } else outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"Video file is not open..\"}");
+                        }
+
+                    }
+
+                }
+
+            //} else outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"Start stream first..\"}");
+        } else outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"Recording in progress, please stop first.. (2)\"}");
 
     } else if (!strcmp(cmd, "!STREAM STOP")) {
 
@@ -1626,8 +1744,7 @@ esp_err_t camsys_handle_cmd(wifi_app_t* app, const char* cmd) {
         if (err != ESP_OK) outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"record delete error: '%d'\"}", err);
 
     } else if (str_starts_with("!WATCH ", cmd)) {
-        const size_t size = 100;
-        char buff[size];
+
         strncpy_offs(buff, 0, cmd, strlen("!WATCH "), 99);
         ESP_LOGI(TAG, "watch data: '%s'", buff);
 

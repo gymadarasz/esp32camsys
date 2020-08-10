@@ -201,6 +201,110 @@ class ErrorPage {
 
 const errorPage = new ErrorPage();
 
+// ----------------- ReplayPage ----------------
+
+class ReplayPage {
+
+  constructor() {
+    pages.subscribe('device-replay', this);
+  }
+
+  onPageShow() {
+    // placeholder for subscription
+  }
+
+  onPageHide() {
+    var cid = $('form[name="device-replay-form"] input[name="cid"]').val();
+    if (cid && deviceList.devices[cid]) {
+      deviceList.devices[cid].ws.send('!STREAM STOP\0');
+    }
+  }
+
+  getReplayForm(cid, indexData) {
+    var device = deviceList.devices[cid];
+    if (!device.updates) return 'Device updates is missing';
+    if (device.updates.mode != 'camera') return 'Incorrect device mode: ' + device.updates.mode + ', please select a camera recorder with SD card.';
+    
+    var secret = deviceSettings.secret;
+    var ts = timestamp.now();
+    var uri = `http://${device.ws.ip4}/replay?secret=${secret}&ts=${ts}`;
+
+    var html = `
+      <form name="device-replay-form">
+        <input name="cid" type="hidden" value="${cid}">
+        <input name="index-size" type="hidden" value="${indexData.size}">
+        <input name="index-pos" type="hidden" value="0">
+
+        <h3 class="center">Replay - <span class="led ${device.alert ? 'red' : ''}"></span> ${device.name}</h3>
+        <br>
+
+        <div class="device ${device.updates.mode}">
+          <div class="frame center">
+            <img class="stream" src="${uri}">
+          </div>
+        </div>
+
+        <br class="clear">
+        <div class="center">
+          <input type="button" value="<" onclick="replayPage.onRewindClick('${cid}')">
+          <input type="button" value=">" onclick="replayPage.onForwardClick('${cid}')">
+          <br>
+          <input type="button" value="Stop" onclick="replayPage.onStopClick('${cid}')">
+          <input type="button" value="Delete" onclick="replayPage.onDeleteClick('${cid}')">
+          <input type="button" value="Back.." onclick="replayPage.onBackClick('${cid}')">
+        </div>
+      </form>
+    `;
+    return html;
+  }
+
+  onRewindClick(cid) {
+    var $pos = $('input[name="index-pos"]');
+    var pos = parseInt($pos.val()) - 1;
+    if (pos < 0) pos = 0;
+    $pos.val(pos);
+
+    var device = deviceList.devices[cid];
+    device.ws.send(`!INDEX ${pos}\0`);
+  }
+
+  onForwardClick(cid) {
+    var size = parseInt($('input[name="index-size"]').val());
+    var $pos = $('input[name="index-pos"]');
+    var pos = parseInt($pos.val()) + 1;
+    if (pos >= size-1) pos = size-1;
+    if (pos < 0) pos = 0;
+    $pos.val(pos);
+
+    var device = deviceList.devices[cid];
+    device.ws.send(`!INDEX ${pos}\0`);
+  }
+
+  showReplayForm(cid) {
+    deviceList.devices[cid].ws.send("?INDEX\0");
+  }
+
+  onIndexRetrieved(ws, indexData) {
+      var html = this.getReplayForm(ws.cid, indexData);
+      $('.page.device-replay').html(html);
+  }
+
+  onStopClick(cid) {
+    deviceList.devices[cid].ws.send('!STREAM STOP\0');
+  }
+
+  onDeleteClick(cid) {
+    deviceList.devices[cid].ws.send('!RECORD DELETE\0');
+  }
+
+  onBackClick(cid) {
+    pages.show('device-view');
+  }
+
+}
+
+const replayPage = new ReplayPage();
+
 // ----------------- DeviceView -----------------
 
 class DeviceView {
@@ -215,10 +319,8 @@ class DeviceView {
 
   onPageHide(classname) {
     clearInterval(this.updateInterval);
-    preloader.show();
-    this.device.ws.send('!STREAM STOP\0', () => {
-      preloader.hide();
-    });
+    var cid = $('form[name="device-view-form"] input[name="cid"]').val();
+    deviceList.devices[cid].ws.send('!STREAM STOP\0');
   }
 
   getWStyle(device) {
@@ -239,16 +341,18 @@ class DeviceView {
     var wstyle = this.getWStyle(device);
     this.device = device;
     var html = `
-      <form>
-        <h3 class="center">Motion sensor</h3>
+      <form name="device-view-form">
+        <input type="hidden" name="cid" value="${cid}">
+        <h3 class="center">Motion sensor - <span class="led ${device.alert ? 'red' : ''}"></span> ${device.name}</h3>
         <br>
 
-        <div class="device ${device.updates.mode}">
-          <div class="frame center" onclick="deviceView.onMotionStreamClick(this, event)">
+        <div class="device ${device.updates.mode}
+            ${device.alert ? 'alert' : ''}">
+          <div class="frame" onclick="deviceView.onMotionStreamClick('${cid}', this, event)">
             <img class="stream" src="${uri}">
             <div class="watcher" style="${wstyle}"></div>
           </div>
-
+          <div class="clear"></div>
           size (<span class="watcher-size">${device.updates.watcher.size}</span>)
           <div class="slider size"></div>
           raster (<span class="watcher-raster">${device.updates.watcher.raster}</span>)
@@ -261,8 +365,12 @@ class DeviceView {
 
         <br class="clear">
         <div class="center">
-          <input type="button" value="Save" onclick="deviceView.onSaveClick()">
-          <input type="button" value="Cancel" onclick="deviceView.onCancelClick()">
+          <input type="button" value="Stop stream" onclick="deviceView.onStreamStopClick('${cid}')">
+          <input type="button" value="Reset device" onclick="deviceView.onResetClick('${cid}')">
+          <br>
+          <input type="button" value="Save" onclick="deviceView.onSaveClick('${cid}')">
+          <input type="button" value="Cancel" onclick="deviceView.onCancelClick('${cid}')">
+          <input class="red" type="button" value="Alert" onclick="deviceView.onAlertClick('${cid}')">
         </div>
       </form>
     `;
@@ -270,7 +378,33 @@ class DeviceView {
   }
 
   getDeviceCameraHtml(device) {
-    console.error("needs to implement");
+    var cid = device.ws.cid;
+    var secret = deviceSettings.secret;
+    var ts = timestamp.now();
+    var uri = `http://${device.ws.ip4}/stream?secret=${secret}&ts=${ts}`;
+    var html = `
+      <form name="device-view-form">
+        <input type="hidden" name="cid" value="${cid}">
+        <h3 class="center">Camera recorder - <span class="led ${device.updates && device.updates.camera.recording ? 'red' : ''}"></span> ${device.name}</h3>
+        <br>
+
+        <div class="device ${device.updates.mode}">
+          <div class="frame center">
+            <img class="stream" src="${uri}">
+          </div>
+        </div>
+
+        <br class="clear">
+        <div class="center">
+          <input type="button" value="Stop stream" onclick="deviceView.onStreamStopClick('${cid}')">
+          <input type="button" value="Reset device" onclick="deviceView.onResetClick('${cid}')">
+          
+          <input type="button" value="Playback" onclick="deviceView.onPlaybackClick('${cid}')">        
+          <input type="button" value="Cancel" onclick="deviceView.onCancelClick('${cid}')">
+        </div>
+      </form>
+    `;
+    return html;
   }
 
   getDeviceHtml(device) {
@@ -293,78 +427,110 @@ class DeviceView {
     device.ws.send('!STREAM STOP\0', () => {
       preloader.hide();
       var html = this.getDeviceHtml(device);
+      var cid = device.ws.cid;
       $('.page.device-view').html(html);
-      $('.page.device-view .slider.size').slider({min: 1, max: 20, value: device.updates.watcher.size, change: function(event, ui) { deviceView.onSizeSliderChange(event, ui); }});
-      $('.page.device-view .slider.raster').slider({min: 1, max: 20, value: device.updates.watcher.raster, change: function(event, ui) { deviceView.onRasterSliderChange(event, ui); }});
-      $('.page.device-view .slider.threshold').slider({min: 1, max: 2000, value: device.updates.watcher.threshold, change: function(event, ui) { deviceView.onThresholdSliderChange(event, ui); }});
-      $('.page.device-view .slider.value').slider({min: 1, max: 2000, value: 0, disabled: true});
+      if (device.updates && device.updates.mode == 'motion') {
+        $('.page.device-view .slider.size').slider({min: 1, max: 20, value: device.updates.watcher.size, change: (event, ui) => { deviceView.onSizeSliderChange(cid, event, ui); }});
+        $('.page.device-view .slider.raster').slider({min: 1, max: 20, value: device.updates.watcher.raster, change: (event, ui) => { deviceView.onRasterSliderChange(cid, event, ui); }});
+        $('.page.device-view .slider.threshold').slider({min: 1, max: 2000, value: device.updates.watcher.threshold, change: (event, ui) => { deviceView.onThresholdSliderChange(cid, event, ui); }});
+        $('.page.device-view .slider.value').slider({min: 1, max: 2000, value: 0, disabled: true});
+      }  
       this.updateInterval = setInterval(() => {
+        deviceList.devices[cid].connected ?
+          $('.page.device-view').removeClass('disconnected') :
+          $('.page.device-view').addClass('disconnected');
         device.ws.send('?UPDATE\0');
-      }, 2000);      
+      }, 500);   
     });
   }
 
-  sendUpdatedWatcher(cb) {
-    var x = this.device.updates.watcher.x;
-    var y = this.device.updates.watcher.y;
-    var size = this.device.updates.watcher.size;
-    var raster = this.device.updates.watcher.raster;
-    var threshold = this.device.updates.watcher.threshold;
+  sendUpdatedWatcher(cid, cb) {
+    var x = deviceList.devices[cid].updates.watcher.x;
+    var y = deviceList.devices[cid].updates.watcher.y;
+    var size = deviceList.devices[cid].updates.watcher.size;
+    var raster = deviceList.devices[cid].updates.watcher.raster;
+    var threshold = deviceList.devices[cid].updates.watcher.threshold;
     var msg = `!WATCH ${x},${y},${size},${raster},${threshold}\0`;
-    this.device.ws.send(msg, cb);
+    deviceList.devices[cid].ws.send(msg, cb);
   }
 
-  showUpdatedWatcher() {
-    $('.page.device-view .watcher').attr('style', this.getWStyle(this.device));
-    $('.page.device-view .watcher-size').html(this.device.updates.watcher.size);
-    $('.page.device-view .watcher-raster').html(this.device.updates.watcher.raster);
-    $('.page.device-view .watcher-threshold').html(this.device.updates.watcher.threshold);
+  showUpdatedWatcher(cid) {
+    $('.page.device-view .watcher').attr('style', this.getWStyle(deviceList.devices[cid]));
+    $('.page.device-view .watcher-size').html(deviceList.devices[cid].updates.watcher.size);
+    $('.page.device-view .watcher-raster').html(deviceList.devices[cid].updates.watcher.raster);
+    $('.page.device-view .watcher-threshold').html(deviceList.devices[cid].updates.watcher.threshold);
   }
 
-  onMotionStreamClick(that, event) {
+  onMotionStreamClick(cid, that, event) {
     var offset = $(that).offset();
     var x = event.pageX - offset.left;
     var y = event.pageY - offset.top;
     x=parseInt(x/3);
     y=parseInt(y/3);
-    this.device.updates.watcher.x = x;
-    this.device.updates.watcher.y = y;
-    this.showUpdatedWatcher();
+    deviceList.devices[cid].updates.watcher.x = x;
+    deviceList.devices[cid].updates.watcher.y = y;
+    this.showUpdatedWatcher(cid);
   }
 
-  onSizeSliderChange(elem, ui) {
-    this.device.updates.watcher.size = ui.value;
-    this.showUpdatedWatcher();
+  onSizeSliderChange(cid, elem, ui) {
+    deviceList.devices[cid].updates.watcher.size = ui.value;
+    this.showUpdatedWatcher(cid);
   }
 
-  onRasterSliderChange(elem, ui) {
-    this.device.updates.watcher.raster = ui.value;
-    this.showUpdatedWatcher();
+  onRasterSliderChange(cid, elem, ui) {
+    deviceList.devices[cid].updates.watcher.raster = ui.value;
+    this.showUpdatedWatcher(cid);
   }
 
-  onThresholdSliderChange(elem, ui) {
-    this.device.updates.watcher.threshold = ui.value;
-    this.showUpdatedWatcher();
+  onThresholdSliderChange(cid, elem, ui) {
+    deviceList.devices[cid].updates.watcher.threshold = ui.value;
+    this.showUpdatedWatcher(cid);
   }
 
-  onSaveClick() {
+  onStreamStopClick(cid) {
+    deviceList.devices[cid].ws.send('!STREAM STOP\0', () => {
+      pages.show('device-list');
+    });
+  }
+
+  onResetClick(cid) {
+    deviceList.devices[cid].ws.send('!RESET\0', () => {
+      pages.show('device-list');
+    });
+  }
+
+  onSaveClick(cid) {
     preloader.show();
-    this.sendUpdatedWatcher(() => {
+    this.sendUpdatedWatcher(cid, () => {
       preloader.hide();
       pages.show('device-list');
     });
   }
 
-  onCancelClick() {
-    pages.show('device-list');
+  onCancelClick(cid) {
+    deviceList.devices[cid].ws.send('!STREAM STOP\0', () => {
+      pages.show('device-list');
+    });
   }
 
   onDeviceUpdated(ws, updates) {
-    if (pages.is('device-view') && this.device && this.device.ws.cid === ws.cid) {
-      console.log('UPDATE:', ws, updates);
+    if (updates.mode != 'motion') return;
+    var cid = ws.cid;
+    if (deviceList.devices[cid] && deviceList.devices[cid].ws.cid === ws.cid) {
       $('.page.device-view .motion-value').html(updates.watcher.diff_sum_max);
       $('.page.device-view .slider.value').slider( "option", "value", updates.watcher.diff_sum_max);
     }
+  }
+
+  onAlertClick(cid) {
+    deviceList.devices[cid].alert = true;
+    system.onDeviceAlert(cid, {});
+    pages.show('device-list');
+  }
+
+  onPlaybackClick(cid) {
+    replayPage.showReplayForm(cid);
+    pages.show('device-replay');
   }
 
 }
@@ -378,6 +544,25 @@ class DeviceList {
     this.devices = [];
     this.counter = new Counter('device');
     this.loadDeviceNames();
+    this.streamStopInterval = setInterval(() => {
+      this.sendStreamStopBroadcast();
+    }, 3000);
+    pages.subscribe('device-list', this);
+  }
+
+  onPageShow(classname) {
+    // placeholder for pages subscription
+  }
+
+  onPageHide(classname) {
+    this.sendStreamStopBroadcast();
+    clearInterval(this.streamStopInterval);
+  }
+
+  sendStreamStopBroadcast() {
+    this.devices.forEach((device) => {
+      device.ws.send('!STREAM STOP\0');
+    });
   }
 
   loadDeviceNames() {
@@ -388,10 +573,16 @@ class DeviceList {
     var mode = 'mode-unknown';
     if (device.updates && device.updates.mode) mode = 'mode-' + device.updates.mode;
     var html = `
-      <div class="device ${mode} ${(device.connected ? 'connected' : 'disconnected')}">
+      <div class="device ${mode} 
+          ${(device.connected ? 'connected' : 'disconnected')} 
+          ${(device.alert ? 'alert' : '')}">
         <div class="icon" onclick="deviceList.onDeviceClick('${device.ws.cid}')"></div>
         <div class="label">
-          <span class="led"></span><span class="name" onclick="deviceList.onDeviceNameClick('${device.ws.cid}')">${device.name}</span>
+          <span class="led 
+            ${(device.alert || 
+                (device.updates && device.updates.camera.recording) ? 
+                  'red' : '')}"></span>
+          <span class="name" onclick="deviceList.onDeviceNameClick('${device.ws.cid}')">${device.name}</span>
         </div>
         <div class="title hidden">Device '${device.name}' from IP:${device.ws.ip4} has mode '${mode}' and now is ${(device.connected ? 'connected' : 'disconnected')}</div>
       </div>`;
@@ -408,7 +599,15 @@ class DeviceList {
       var device = this.devices[cid];
       html += this.getDeviceHtml(device);
     }
-    html += '</form>';
+    html += `
+        <br class="clear">
+        <div class="center">
+          <input type="button" value="Stop all stream" onclick="deviceList.onStreamStopAllClick()">
+          <input type="button" value="Reset all device" onclick="deviceList.onResetAllClick()">
+          <br>
+          <input class="green" type="button" value="Alert OFF" onclick="deviceList.onAlertOffClick()">
+        </div>
+      </form>`;
     return html;
   }
 
@@ -464,9 +663,99 @@ class DeviceList {
     deviceNameEditForm.setForm(cid, device.name);
     pages.show('device-name-edit');
   }
+
+  onStreamStopAllClick() {
+    for (var cid in this.devices) {
+      var device = this.devices[cid];
+      device.ws.send('!STREAM STOP\0');
+    }
+  }
+
+  onResetAllClick() {
+    for (var cid in this.devices) {
+      var device = this.devices[cid];
+      device.ws.send('!RESET\0');
+    }
+  }
+
+  onAlertOffClick() {
+    system.alertStop();
+  }
 }
 
 const deviceList = new DeviceList();
+
+// ----------------------------------------
+
+class System {
+  
+  constructor() {
+    this.alert = false;
+  }
+  
+  onDeviceAlert(ws, message) {
+    var cid = ws.cid;
+    this.alertStart(cid);
+  }
+
+  alertStart(cid) {
+    $('body').addClass('alert');
+    this.alert = true;
+    if (cid && deviceList.devices[cid]) {
+      deviceList.devices[cid].alert = true;
+    }
+    this.sendRecordStartBroadcast();
+  }
+
+  alertStop() {
+    $('body').removeClass('alert');
+    this.alert = false;
+    for (var cid in deviceList.devices) {
+      var device = deviceList.devices[cid];
+      if (device.updates && device.updates.mode == 'motion') {
+        deviceList.devices[cid].alert = false;
+      }
+    }
+    this.sendRecordStopBroadcast();
+    this.sendStreamStopBroadcast();
+  }
+
+  sendRecordStopBroadcast() {
+    for (var cid in deviceList.devices) {
+      var device = deviceList.devices[cid];
+      if (device.updates && device.updates.mode == 'camera') {
+        device.ws.send('!RECORD STOP\0');
+      }
+    }
+  }
+
+  sendRecordStartBroadcast() {
+    for (var cid in deviceList.devices) {
+      var device = deviceList.devices[cid];
+      if (device.updates && device.updates.mode == 'camera') {
+        device.ws.send('!RECORD START\0');
+        // TODO pending on stream url to start streaming too!!! (or change the ESP code to record in loop function)
+      }
+    }
+  }
+
+  sendUpdateBroadcast() {
+    for (var cid in deviceList.devices) {
+      var device = deviceList.devices[cid];
+        device.ws.send('?UPDATE\0');
+    }
+  }
+
+  sendStreamStopBroadcast() {
+    for (var cid in deviceList.devices) {
+      var device = deviceList.devices[cid];
+      device.ws.send('!STREAM STOP\0');
+    }
+  }
+
+}
+
+const system = new System();
 
 // ----------------------------------------
 
@@ -481,9 +770,22 @@ class App {
     delete message.func;
     switch (func) {
       case 'update':
-        deviceList.onDeviceUpdated(ws, message);
-        deviceView.onDeviceUpdated(ws, message);
-        break;
+      if (pages.is('device-list')) deviceList.onDeviceUpdated(ws, message);
+      if (pages.is('device-view')) deviceView.onDeviceUpdated(ws, message);
+      break;
+
+      case 'alert':
+      system.onDeviceAlert(ws, message);
+      break;
+
+      case 'index':
+      if (pages.is('device-replay')) replayPage.onIndexRetrieved(ws, message);
+      break;
+
+//       case 'err':
+          // TODO.....
+//       break;
+
       default:
         console.error('Unknown websocket message function: ' + func, 'message:', message);
     }
@@ -525,6 +827,11 @@ const auth = function(message) {
 
 wss.on('connection', (ws, req) => {
   ws.isAlive = true;
+  if (!ws._socket.remoteAddress) {
+    console.warn('no IP');
+    ws.terminate();
+    return;
+  }
   ws.ip4 = ip6to4(ws._socket.remoteAddress);
   ws.on('pong', () => {
     ws.isAlive = true;
@@ -539,12 +846,15 @@ wss.on('connection', (ws, req) => {
         return;
       }
     } else {
+      var ok = true;
       try {
-        var parsed = JSON.parse(message)
+        var parsed = JSON.parse(message);        
       } catch (e) {
-        console.error('JSON parse error: ', message);
+        //console.error('JSON parse error: ', message);
+        ws.send('!RESET\0');
+        ok = false;
       }
-      app.onClientMessage(ws, parsed);
+      if (ok) app.onClientMessage(ws, parsed);
     }
   });
 
@@ -592,6 +902,9 @@ class Menu {
   }
   onDeviceListClick() {
     pages.show('device-list');
+  }
+  onReloadClick() {
+    location.href = location.href;
   }
 }
 
