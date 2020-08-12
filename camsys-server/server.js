@@ -166,6 +166,18 @@ const pages = new Pages();
 
 class DeviceNameEditForm {
 
+  constructor() {
+    pages.subscribe('device-name-edit', this);
+  }
+
+  onPageShow() {
+    window.stop()
+  }
+
+  onPageHide() {
+    window.stop()
+  }
+
   setForm(cid, name) {
     $('form[name="device-name-edit-form"] input[name="cid"]').val(cid);
     $('form[name="device-name-edit-form"] input[name="name"]').val(name);
@@ -189,6 +201,19 @@ const deviceNameEditForm = new DeviceNameEditForm();
 // ------------------- ErrorPage ----------------
 
 class ErrorPage {
+
+  constructor() {
+    pages.subscribe('error-page', this);
+  }
+
+  onPageShow() {
+    window.stop()
+  }
+
+  onPageHide() {
+    window.stop()
+  }
+  
   show(message, returnPage) {
     $('form[name="error-page-form"] .msg').html(message);
     this.returnPage = returnPage;
@@ -210,14 +235,18 @@ class ReplayPage {
   }
 
   onPageShow() {
-    // placeholder for subscription
+    window.stop()
   }
 
   onPageHide() {
+    if (this.pollStreamInterval) {
+      clearInterval(this.pollStreamInterval);
+    }
     var cid = $('form[name="device-replay-form"] input[name="cid"]').val();
     if (cid && deviceList.devices[cid]) {
       deviceList.devices[cid].ws.send('!STREAM STOP\0');
     }
+    window.stop()
   }
 
   getReplayForm(cid, indexData) {
@@ -247,6 +276,7 @@ class ReplayPage {
         <br class="clear">
         <div class="center">
           <input type="button" value="<" onclick="replayPage.onRewindClick('${cid}')">
+          <span class="stream-size">?</span>/<span class="stream-position">?</span>
           <input type="button" value=">" onclick="replayPage.onForwardClick('${cid}')">
           <br>
           <input type="button" value="Stop" onclick="replayPage.onStopClick('${cid}')">
@@ -281,12 +311,22 @@ class ReplayPage {
   }
 
   showReplayForm(cid) {
-    deviceList.devices[cid].ws.send("?INDEX\0");
+    deviceList.devices[cid].ws.send('?INDEX\0');
   }
 
   onIndexRetrieved(ws, indexData) {
-      var html = this.getReplayForm(ws.cid, indexData);
-      $('.page.device-replay').html(html);
+    var cid = ws.cid;
+    var html = this.getReplayForm(cid, indexData);
+    $('.page.device-replay').html(html);
+    this.pollStreamInterval = setInterval(() => {
+      deviceList.devices[cid].ws.send('?STREAM\0');
+    }, 500);
+  }
+
+  onStreamInfoReceived(ws, streamData) {
+    var cid = ws.cid;
+    $('.page.device-replay .stream-size').html(streamData.size);
+    $('.page.device-replay .stream-position').html(streamData.position);
   }
 
   onStopClick(cid) {
@@ -298,7 +338,7 @@ class ReplayPage {
   }
 
   onBackClick(cid) {
-    pages.show('device-view');
+    pages.show('device-list');
   }
 
 }
@@ -314,13 +354,14 @@ class DeviceView {
   }
 
   onPageShow(classname) {
-    // placeholder for pages subscription
+    window.stop()
   }
 
   onPageHide(classname) {
     clearInterval(this.updateInterval);
     var cid = $('form[name="device-view-form"] input[name="cid"]').val();
     deviceList.devices[cid].ws.send('!STREAM STOP\0');
+    window.stop()
   }
 
   getWStyle(device) {
@@ -488,9 +529,7 @@ class DeviceView {
   }
 
   onStreamStopClick(cid) {
-    deviceList.devices[cid].ws.send('!STREAM STOP\0', () => {
-      pages.show('device-list');
-    });
+    deviceList.devices[cid].ws.send('!STREAM STOP\0');
   }
 
   onResetClick(cid) {
@@ -544,14 +583,14 @@ class DeviceList {
     this.devices = [];
     this.counter = new Counter('device');
     this.loadDeviceNames();
-    this.streamStopInterval = setInterval(() => {
-      this.sendStreamStopBroadcast();
-    }, 3000);
     pages.subscribe('device-list', this);
   }
 
   onPageShow(classname) {
-    // placeholder for pages subscription
+    this.sendStreamStopBroadcast();
+    this.streamStopInterval = setInterval(() => {
+      this.sendStreamStopBroadcast();
+    }, 3000);
   }
 
   onPageHide(classname) {
@@ -560,6 +599,7 @@ class DeviceList {
   }
 
   sendStreamStopBroadcast() {
+    window.stop()
     this.devices.forEach((device) => {
       device.ws.send('!STREAM STOP\0');
     });
@@ -782,12 +822,16 @@ class App {
       if (pages.is('device-replay')) replayPage.onIndexRetrieved(ws, message);
       break;
 
+      case 'stream':
+      if (pages.is('device-replay')) replayPage.onStreamInfoReceived(ws, message);
+      break;
+
 //       case 'err':
           // TODO.....
 //       break;
 
       default:
-        console.error('Unknown websocket message function: ' + func, 'message:', message);
+        console.error('Unknown websocket message function: "' + func + '", message:', message);
     }
   }
 

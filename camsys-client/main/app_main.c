@@ -50,9 +50,6 @@
 #undef TAG
 // --------------------------------------------------------------------
 
-
-
-
 #define CAMSYS_NAMESPACE "camsys"
 
 static const char *TAG = CAMSYS_NAMESPACE;
@@ -660,17 +657,20 @@ static const char* CAMSYS_CAMERA_STREAM_PART = "Content-Type: image/jpeg\r\nCont
 
 wifi_app_t* _app = NULL;
 
-#define RECORD_INDEX_CONTER_MAX 100
+#define RECORD_INDEX_CONTER_MAX 1000
 int record_index_cnt = 0;
 
 camera_fb_t * camsys_fb_get(wifi_app_t* app) {
-    while(camsys_fb_hold);
+    while(camsys_fb_hold) ESP_LOGI(TAG, "camsys_fb_hold...");
     camsys_fb_hold = true;
-    camera_fb_t * fb = esp_camera_fb_get();    
+    camera_fb_t * fb = esp_camera_fb_get();  
+    ESP_LOGI(TAG, "(dbg 10)");  
     if (fb && app->ext->sys->mode == CAMSYS_MODE_CAMERA && app->ext->sys->camera->file) {
+        ESP_LOGI(TAG, "(dbg 11)");  
 
         record_index_cnt--;
         if (record_index_cnt<=0) {
+            ESP_LOGI(TAG, "(dbg 12)");  
             record_index_cnt = RECORD_INDEX_CONTER_MAX;
             long int pos = ftell(app->ext->sys->camera->file);
             if (pos == 1L) ESP_LOGW(TAG, "Index retr fail");
@@ -694,6 +694,7 @@ camera_fb_t * camsys_fb_get(wifi_app_t* app) {
             }
         }
     }
+    if (!fb) camsys_fb_hold = false;
     return fb;
 }
 
@@ -727,31 +728,39 @@ bool camsys_check_secret(wifi_app_t* app, httpd_req_t* req) {
     return secret_ok;
 }
 
+bool replay_fb_hold = false;
 camera_fb_t * replay_fb_get(wifi_app_t* app) {
+    while(replay_fb_hold);
+    replay_fb_hold = true;
     camera_fb_t* fb = malloc(sizeof(camera_fb_t));
     if (!fb) {
         ESP_LOGE(TAG, "mem alloc fb err");
+        replay_fb_hold = false;
         return NULL;
     }
     FILE* f = app->ext->sys->camera->file;
     if (!f) {
         ESP_LOGE(TAG, "rec file is not open");
+        replay_fb_hold = false;
         free(fb);
         return NULL;
     }
     if (1 != fread(fb, sizeof(camera_fb_t), 1, f)) {
         ESP_LOGE(TAG, "rec fb read err");
+        replay_fb_hold = false;
         free(fb);
         return NULL;
     }
     fb->buf = malloc(fb->len);
     if (!fb) {
         ESP_LOGE(TAG, "mem alloc fb->buf err");
+        replay_fb_hold = false;
         free(fb);
         return NULL;
     }
     if (fb->len != fread(fb->buf, sizeof(uint8_t), fb->len, f)) {
         ESP_LOGE(TAG, "rec fb->buf read err");
+        replay_fb_hold = false;
         free(fb->buf);
         free(fb);
         return NULL;
@@ -761,6 +770,7 @@ camera_fb_t * replay_fb_get(wifi_app_t* app) {
 }
 
 esp_err_t replay_fb_return(camera_fb_t* fb) {
+    if (!replay_fb_hold) return ESP_FAIL;
     free(fb->buf);
     free(fb);
     return ESP_OK;
@@ -777,47 +787,73 @@ esp_err_t camsys_camera_httpd_stream_replay_handler(wifi_app_t* app, httpd_req_t
     if(res != ESP_OK) return res;
   
     app->ext->sys->streaming = true;
+    ESP_LOGI(TAG, "*STRM STRT");
 
     if (replay) ESP_ERROR_CHECK( camera_recording_open(app->ext->sys->camera, "rb") );
 
     while(app->ext->sys->streaming) {   
+
+        ESP_LOGI(TAG, "*STRM.. (dbg1)");
         
         fb = replay ? replay_fb_get(app) : camsys_fb_get(app);
         
+        ESP_LOGI(TAG, "*STRM.. (dbg2)");
+
         if (!fb) {
             ESP_LOGE(TAG, "Cam capt fail");
             res = ESP_FAIL;
             break;
         }
 
+        ESP_LOGI(TAG, "*STRM.. (dbg3)");
+
         _jpg_buf_len = fb->len;
         _jpg_buf = fb->buf;
-        
+
+        ESP_LOGI(TAG, "*STRM.. (dbg4)");
 
         if(res == ESP_OK) {
             res = httpd_resp_send_chunk(req, CAMSYS_CAMERA_STREAM_BOUNDARY, strlen(CAMSYS_CAMERA_STREAM_BOUNDARY));
-        }
+        } else ESP_LOGE(TAG, "Cam err 1");
+
+        ESP_LOGI(TAG, "*STRM.. (dbg5)");
+
         if(res == ESP_OK) {
             size_t hlen = snprintf((char *)part_buf, 64, CAMSYS_CAMERA_STREAM_PART, _jpg_buf_len);
 
             res = httpd_resp_send_chunk(req, (const char *)part_buf, hlen);
-        }
+        } else ESP_LOGE(TAG, "Cam err 2");
+
+        ESP_LOGI(TAG, "*STRM.. (dbg6)");
+        
         if(res == ESP_OK) {
             res = httpd_resp_send_chunk(req, (const char *)_jpg_buf, _jpg_buf_len);
-        }
+        } else ESP_LOGE(TAG, "Cam err 3");
+
+        ESP_LOGI(TAG, "*STRM.. (dbg7)");
+        
         if(fb->format != PIXFORMAT_JPEG) {
             free(_jpg_buf);
+            ESP_LOGW(TAG, "Cam err 4");
         }
+
+        ESP_LOGI(TAG, "*STRM.. (dbg8)");
+        
         if(res != ESP_OK || (replay ? replay_fb_return(fb) : camsys_fb_return(fb)) != ESP_OK) {
             if (res == ESP_OK) res = ESP_FAIL;
+            ESP_LOGE(TAG, "Cam err 5");
             break;
         }
         
     }
 
+    ESP_LOGI(TAG, "*STRM.. (dbg9)");
+        
     if (replay) ESP_ERROR_CHECK( camera_recording_stop(app->ext->sys->camera) );
 
     app->ext->sys->streaming = false;
+    replay ? replay_fb_return(fb) : camsys_fb_return(fb);
+    ESP_LOGI(TAG, "*STRM STP");
 
     return res;
 }
@@ -864,20 +900,25 @@ esp_err_t camsys_motion_httpd_image_handler(wifi_app_t* app, httpd_req_t* req) {
 
         if(res == ESP_OK){
             res = httpd_resp_send_chunk(req, MOTION__STREAM_BOUNDARY, strlen(MOTION__STREAM_BOUNDARY));
-        }
+        } else ESP_LOGE(TAG, "Cam err 11");
+
         if(res == ESP_OK){
             size_t hlen = snprintf((char *)part_buf, 64, MOTION__STREAM_PART, _bmp_buf_len);
 
             res = httpd_resp_send_chunk(req, (const char *)part_buf, hlen);
-        }
+        } else ESP_LOGE(TAG, "Cam err 12");
+
         if(res == ESP_OK){
             res = httpd_resp_send_chunk(req, (const char *)_bmp_buf, _bmp_buf_len);
-        }
+        } else ESP_LOGE(TAG, "Cam err 13");
+
         if(fb->format != PIXFORMAT_JPEG){
             free(_bmp_buf);
+            ESP_LOGW(TAG, "Cam err 14");
         }
         // esp_camera_fb_return(fb);
         if(res != ESP_OK){
+            ESP_LOGE(TAG, "Cam err 15");
             break;
         }
     }
@@ -962,18 +1003,21 @@ esp_err_t websock_sendf(esp_websocket_client_handle_t client, const char* fmt, .
 
 // ----------------- camera/motion websocket loops ---------------------
 
-void camsys_camera_websock_loop(wifi_app_t* app) {
+bool camsys_is_camera_replay(wifi_app_t* app) {
     // record video when recording but not streaming and not playback
-    if (!app->ext->sys->streaming && app->ext->sys->camera->file && app->ext->sys->camera->idxf) {
+    return !app->ext->sys->streaming && app->ext->sys->camera->file && app->ext->sys->camera->idxf;
+}
+
+void camsys_camera_websock_loop(wifi_app_t* app) {
+    if (camsys_is_camera_replay(app)) {
         ESP_LOGI(TAG, "rec.. (no strm)");
 
         camera_fb_t * fb = camsys_fb_get(app);
         
         if (!fb) {
             ESP_LOGE(TAG, "Cam capture fail");
-        } else {
-            if (ESP_OK != camsys_fb_return(fb)) ESP_LOGE(TAG, "Cam fb ret fail");
         }
+        if (ESP_OK != camsys_fb_return(fb)) ESP_LOGE(TAG, "Cam fb ret fail");
         
     }
 }
@@ -1667,6 +1711,15 @@ esp_err_t camsys_handle_cmd(wifi_app_t* app, const char* cmd) {
     
     if (!strcmp(cmd, "?UPDATE")) {
         
+    } else if (!strcmp(cmd, "?STREAM")) {
+
+        if (app->ext->sys->camera->file) {
+            //if (!app->ext->sys->camera->idxf) {
+                long int sz = get_file_size(SDCARD_MOUNT_POINT"/record.vid");
+                long int ps = ftell(app->ext->sys->camera->file);
+                outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"stream\",\"size\":%ld,\"position\":%ld}", sz, ps);
+            //} else outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"Recording in progress, please stop it first..\"}");
+        } else outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"Stream is not in progress, please start it first..\"}");
 
     } else if (!strcmp(cmd, "?INDEX")) {
 
@@ -1782,12 +1835,12 @@ esp_err_t camsys_handle_cmd(wifi_app_t* app, const char* cmd) {
 
 void wscli_app_on_websock_data(void* arg, esp_websocket_event_data_t* data) {
     wifi_app_t* app = arg; // using argument as an app
-    ESP_LOGI(TAG, "----------- [WEBSOCKET DATA] -------------");
+//     ESP_LOGI(TAG, "----------- [WEBSOCKET DATA] -------------");
 
-    ESP_LOGI(TAG, "WEBSOCKET_EVENT_DATA");
-    ESP_LOGI(TAG, "Received opcode=%d", data->op_code); // 1-text; 2-binary
-    ESP_LOGW(TAG, "Received=%.*s", data->data_len, (char *)data->data_ptr);
-    ESP_LOGW(TAG, "Total payload length=%d, data_len=%d, current payload offset=%d\r\n", data->payload_len, data->data_len, data->payload_offset);
+//     ESP_LOGI(TAG, "WEBSOCKET_EVENT_DATA");
+//     ESP_LOGI(TAG, "Received opcode=%d", data->op_code); // 1-text; 2-binary
+//     ESP_LOGW(TAG, "Received=%.*s", data->data_len, (char *)data->data_ptr);
+//     ESP_LOGW(TAG, "Total payload length=%d, data_len=%d, current payload offset=%d\r\n", data->payload_len, data->data_len, data->payload_offset);
 
     ESP_ERROR_CHECK( camsys_handle_cmd(app, data->data_ptr) );
 
