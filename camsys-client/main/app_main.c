@@ -333,9 +333,28 @@ long int get_file_size(const char* filename)
 // CAMERA
 // ------------------------------------------------------
 
+// --------------- record index
+
+#define RECORD_INDEX_MARKER_SIZE 30
+
+typedef char record_index_marker_t[RECORD_INDEX_MARKER_SIZE];
+
+struct record_index_s {
+    long int position;
+    record_index_marker_t marker;
+};
+
+typedef struct record_index_s record_index_t;
+
+#define RECORD_INDEX_CONTER_MAX 1000
+int record_index_cnt = 0;
+
+// ----------------
+
 struct camsys_camera_s {
     FILE* file;
     FILE* idxf;
+    record_index_marker_t marker;
 };
 
 typedef struct camsys_camera_s camsys_camera_t;
@@ -345,6 +364,7 @@ bool camsys_fb_hold = false;
 void camera_recording_init(camsys_camera_t* camera) {
     camera->file = NULL;
     camera->idxf = NULL;
+    camera->marker[0] = '\0';
 }
 
 esp_err_t camera_recording_stop(camsys_camera_t* camera) {
@@ -657,8 +677,6 @@ static const char* CAMSYS_CAMERA_STREAM_PART = "Content-Type: image/jpeg\r\nCont
 
 wifi_app_t* _app = NULL;
 
-#define RECORD_INDEX_CONTER_MAX 1000
-int record_index_cnt = 0;
 
 camera_fb_t * camsys_fb_get(wifi_app_t* app) {
     while(camsys_fb_hold) ESP_LOGI(TAG, "camsys_fb_hold...");
@@ -672,11 +690,13 @@ camera_fb_t * camsys_fb_get(wifi_app_t* app) {
         if (record_index_cnt<=0) {
             ESP_LOGI(TAG, "(dbg 12)");  
             record_index_cnt = RECORD_INDEX_CONTER_MAX;
-            long int pos = ftell(app->ext->sys->camera->file);
-            if (pos == 1L) ESP_LOGW(TAG, "Index retr fail");
+            record_index_t index;
+            index.position = ftell(app->ext->sys->camera->file);
+            if (index.position == 1L) ESP_LOGW(TAG, "Index retr fail");
             else {
+                strncpy(index.marker, app->ext->sys->camera->marker, RECORD_INDEX_MARKER_SIZE);
                 ESP_LOGI(TAG, "idxf(%d)", !!app->ext->sys->camera->idxf);
-                if (1 != fwrite(&pos, sizeof(long int), 1, app->ext->sys->camera->idxf)) 
+                if (1 != fwrite(&index, sizeof(record_index_t), 1, app->ext->sys->camera->idxf)) 
                     ESP_LOGW(TAG, "Index write fail: err: %d", ferror(app->ext->sys->camera->idxf));
             }
         }
@@ -730,7 +750,7 @@ bool camsys_check_secret(wifi_app_t* app, httpd_req_t* req) {
 
 bool replay_fb_hold = false;
 camera_fb_t * replay_fb_get(wifi_app_t* app) {
-    while(replay_fb_hold);
+    while(replay_fb_hold) ESP_LOGI(TAG, "hold (dbg 10)");
     replay_fb_hold = true;
     camera_fb_t* fb = malloc(sizeof(camera_fb_t));
     if (!fb) {
@@ -773,6 +793,7 @@ esp_err_t replay_fb_return(camera_fb_t* fb) {
     if (!replay_fb_hold) return ESP_FAIL;
     free(fb->buf);
     free(fb);
+    replay_fb_hold = false;
     return ESP_OK;
 }
 
@@ -1692,6 +1713,7 @@ void wscli_app_on_websock_disconnected(void* arg) {
 
 #define RESPONSE_SIZE 1000
 char response_buff[RESPONSE_SIZE];
+
 int camsys_resp_update(camsys_t* sys, watcher_t watcher, size_t diff_sum_max) {
     response_buff[0] = '\0';
     return snprintf(response_buff, RESPONSE_SIZE, 
@@ -1701,6 +1723,56 @@ int camsys_resp_update(camsys_t* sys, watcher_t watcher, size_t diff_sum_max) {
         (sys->camera->file ? "true" : "false"),
         watcher.x, watcher.y, watcher.size, watcher.raster, watcher.threshold, diff_sum_max
     );
+}
+
+int record_index_get(wifi_app_t* app, int outlen, const char* cmd, char* buff, const size_t size, bool jump_to) {
+    
+    if (!app->ext->sys->camera->idxf) {
+        //if (!app->ext->sys->streaming) {
+
+            strncpy_offs(buff, 0, cmd, strlen("*INDEX "), 99);
+            ESP_LOGI(TAG, "index param: '%s'", buff);
+            long int n = atol(buff);
+
+            FILE* idxf = fopen(SDCARD_MOUNT_POINT"/record.idx", "rb");
+            if (!idxf) {
+                ESP_LOGW(TAG, "index file open error (2): %d", errno);
+                outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"index file open error (2): %d\"}", errno);
+            } else {
+                
+                if (fseek(idxf, n * sizeof(record_index_t), SEEK_SET)) {                
+                    ESP_LOGW(TAG, "index file seek error");
+                    outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"index file seek error\"}");
+                } else {
+
+                    record_index_t index; 
+                    if (1 != fread(&index, sizeof(record_index_t), 1, idxf)) {
+                        ESP_LOGW(TAG, "index file read error");
+                        outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"index file reed error\"}");
+                    } else {
+                        if (jump_to) {
+                            while(camsys_fb_hold) ESP_LOGI(TAG, "FB HOLD... (2)");
+                            if (app->ext->sys->camera->file) {
+                                if (fseek(app->ext->sys->camera->file, index.position, SEEK_SET)) {                
+                                    ESP_LOGW(TAG, "record video file seek error");
+                                    outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"record video file seek error\"}");
+                                } else {
+                                    
+                                    if (fclose(idxf)) ESP_LOGW(TAG, "index file close error");
+                                }
+                            } else outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"Video file is not open..\"}");
+                        }
+                        outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"index_record\",\"at\":%ld,\"position\":%ld,\"marker\":\"%s\"}", n, index.position, index.marker);
+                    }
+
+                }
+
+            }
+
+        //} else outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"Start stream first..\"}");
+    } else outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"Recording in progress, please stop first.. (3)\"}");
+
+    return outlen;
 }
 
 esp_err_t camsys_handle_cmd(wifi_app_t* app, const char* cmd) {
@@ -1727,55 +1799,23 @@ esp_err_t camsys_handle_cmd(wifi_app_t* app, const char* cmd) {
             long int sz = get_file_size(SDCARD_MOUNT_POINT"/record.idx");
             if (sz < 0) outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"Index retrieve error: %ld\"}", sz);
             else {
-                sz /= sizeof(long int);
+                sz /= sizeof(record_index_t);
                 outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"index\",\"size\":%ld}", sz);
             }
         } else outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"Recording in progress, please stop first.. (1)\"}");
     
+    } else if (str_starts_with("?INDEX ", cmd)) {
+
+        outlen = record_index_get(app, outlen, cmd, buff, size, false);
+
     } else if (str_starts_with("!INDEX ", cmd)) {
+        
+        outlen = record_index_get(app, outlen, cmd, buff, size, true);
 
-        if (!app->ext->sys->camera->idxf) {
-            //if (!app->ext->sys->streaming) {
+    } else if (str_starts_with("!MARKER ", cmd)) {
 
-                strncpy_offs(buff, 0, cmd, strlen("!INDEX "), 99);
-                ESP_LOGI(TAG, "index param: '%s'", buff);
-                long int n = atoi(buff);
-
-                FILE* idxf = fopen(SDCARD_MOUNT_POINT"/record.idx", "rb");
-                if (!idxf) {
-                    ESP_LOGW(TAG, "index file open error (2): %d", errno);
-                    outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"index file open error (2): %d\"}", errno);
-                } else {
-                    
-                    if (fseek(idxf, n * sizeof(long int), SEEK_SET)) {                
-                        ESP_LOGW(TAG, "index file seek error");
-                        outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"index file seek error\"}");
-                    } else {
-
-                        long int fpos; 
-                        if (1 != fread(&fpos, sizeof(long int), 1, idxf)) {
-                            ESP_LOGW(TAG, "index file read error");
-                            outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"index file reed error\"}");
-                        } else {
-
-                            while(camsys_fb_hold) ESP_LOGI(TAG, "FB HOLD... (2)");
-                            if (app->ext->sys->camera->file) {
-                                if (fseek(app->ext->sys->camera->file, fpos, SEEK_SET)) {                
-                                    ESP_LOGW(TAG, "record video file seek error");
-                                    outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"record video file seek error\"}");
-                                } else {
-
-                                    if (fclose(idxf)) ESP_LOGW(TAG, "index file close error");
-                                }
-                            } else outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"Video file is not open..\"}");
-                        }
-
-                    }
-
-                }
-
-            //} else outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"Start stream first..\"}");
-        } else outlen = snprintf(response_buff, RESPONSE_SIZE, "{\"func\":\"err\",\"msg\":\"Recording in progress, please stop first.. (2)\"}");
+        strncpy_offs(app->ext->sys->camera->marker, 0, cmd, strlen("!MARKER "), RECORD_INDEX_MARKER_SIZE);
+        ESP_LOGI(TAG, "new marker is: '%s'", app->ext->sys->camera->marker);
 
     } else if (!strcmp(cmd, "!STREAM STOP")) {
 

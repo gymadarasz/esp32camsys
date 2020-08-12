@@ -1113,3 +1113,5 @@ const deviceSettingsForm = new DeviceSettingsForm();
 
 menu.onDeviceListClick();
 preloader.hide();
+
+// TODO set marker as current date/time with "!MARKER [date-string]" websocket command
