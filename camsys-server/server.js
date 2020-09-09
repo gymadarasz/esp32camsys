@@ -60,6 +60,19 @@ class Timestamp {
   now() {
     return Date.now() / 1000 | 0;
   }
+  getDateMarkerFormatted() {
+    var date = new Date();
+    function f(n) {
+      // Format integers to have at least two digits.
+      return n < 10 ? '0' + n : n;
+    }
+    return date.getUTCFullYear()   + '-' +
+         f(date.getUTCMonth() + 1) + '-' +
+         f(date.getUTCDate())      + ' ' +
+         f(date.getUTCHours())     + ':' +
+         f(date.getUTCMinutes())   + ':' +
+         f(date.getUTCSeconds())   + ' UTC';
+  }
 }
 
 const timestamp = new Timestamp();
@@ -325,6 +338,7 @@ class ReplayPage {
 
   onStreamInfoReceived(ws, streamData) {
     var cid = ws.cid;
+    console.log(streamData);
     $('.page.device-replay .stream-size').html(streamData.size);
     $('.page.device-replay .stream-position').html(streamData.position);
   }
@@ -731,6 +745,20 @@ class System {
   
   constructor() {
     this.alert = false;
+
+    this.sendMarkerBroadcastIntervall = setInterval(() => {
+      this.sendMarkerBroadcast();
+    }, 1000);
+  }
+
+  sendMarkerBroadcast() {
+    var marker = timestamp.getDateMarkerFormatted();
+    for (var cid in deviceList.devices) {
+      var device = deviceList.devices[cid];
+      if (device.updates && device.updates.mode == 'camera') {
+        device.ws.send('!MARKER ' + marker + '\0');
+      }
+    }
   }
   
   onDeviceAlert(ws, message) {
@@ -774,7 +802,6 @@ class System {
       var device = deviceList.devices[cid];
       if (device.updates && device.updates.mode == 'camera') {
         device.ws.send('!RECORD START\0');
-        // TODO pending on stream url to start streaming too!!! (or change the ESP code to record in loop function)
       }
     }
   }
