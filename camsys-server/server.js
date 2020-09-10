@@ -1026,7 +1026,7 @@ class DeviceSettingsForm {
           $paths.append(`<option value="${port.path}">${port.path}</option>`);
         });
       });
-    }, 2000);
+    }, 10000); // TODO: update options only when changed
   }
 
   addWifiCredentialInputs(ssid, pswd) {
